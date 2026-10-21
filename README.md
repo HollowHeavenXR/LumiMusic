@@ -1,6 +1,6 @@
 # LumiMusic
 
-The Android edition of [Lumisound](https://github.com/HeavenlyXenusVR/Lumisound) — same
+The Android edition of [Lumisound](https://github.com/HollowHeavenXR/Lumisound) — same
 account, same bridge, same cloud library.
 
 LumiMusic is not a separate service with an import button bolted on. It talks to the
