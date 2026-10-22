@@ -71,6 +71,9 @@ class CloudImportService(
     private val _progress = MutableStateFlow(ImportProgress())
     val progress: StateFlow<ImportProgress> = _progress.asStateFlow()
 
+    @Volatile
+    private var lastAccentRefreshAt: Long = 0L
+
     suspend fun import(stages: Set<ImportStage> = ImportStage.entries.toSet()): ImportProgress {
         _progress.value = ImportProgress(
             running = true,
@@ -165,9 +168,25 @@ class CloudImportService(
     suspend fun refreshAccent() {
         try {
             appearance.setAccent(http.libraryData.settings().themeColor)
+            lastAccentRefreshAt = System.currentTimeMillis()
         } catch (e: Exception) {
             // Keeping the stored colour is the right failure: it was correct last time.
         }
+    }
+
+    /**
+     * [refreshAccent], unless the last pull was under [minIntervalMs] ago.
+     *
+     * The accent used to be refreshed only once, at process start -- so an account whose
+     * `theme_color` changed on another device (iOS, or a reinstall here) never picked it up
+     * on this phone until the app was fully killed and relaunched, even though the gallery
+     * background re-syncs on every return to the foreground. Called from the same
+     * foreground trigger as [com.lumisound.android.gallery.GalleryBackgroundStore.syncIfStale]
+     * so the two settle on the same cadence.
+     */
+    suspend fun refreshAccentIfStale(minIntervalMs: Long = ACCENT_STALE_AFTER_MS) {
+        if (System.currentTimeMillis() - lastAccentRefreshAt < minIntervalMs) return
+        refreshAccent()
     }
 
     private fun mark(stage: ImportStage, result: StageResult) {
@@ -178,6 +197,7 @@ class CloudImportService(
 
     private companion object {
         const val TAG = "LumiImport"
+        const val ACCENT_STALE_AFTER_MS = 60_000L
     }
 }
 

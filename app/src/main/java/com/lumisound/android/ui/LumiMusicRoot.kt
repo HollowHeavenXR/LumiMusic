@@ -124,6 +124,13 @@ private fun SignedInShell(container: AppContainer) {
     LaunchedEffect(lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { container.gallery.syncIfStale() }
     }
+    // The account accent (theme_color) used to be pulled only once, at process start --
+    // unlike the gallery above, it never re-checked on a return to the foreground. An
+    // accent changed on another device sat stale here until the app was force-killed and
+    // relaunched. Same trigger and cadence as the gallery sync above.
+    LaunchedEffect(lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { container.cloudImport.refreshAccentIfStale() }
+    }
 
     CompositionLocalProvider(LocalAura provides aura) {
         AuraBackdrop(
