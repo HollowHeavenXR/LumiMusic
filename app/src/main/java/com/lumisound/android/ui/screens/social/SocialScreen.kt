@@ -47,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.lumisound.android.ui.aura.AuraBase
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -395,9 +396,9 @@ private fun LiveCard(entry: FriendWithPresence, avatar: Any?, callbacks: SocialC
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Filled.GraphicEq, contentDescription = null, tint = Color(0xFF07080F), modifier = Modifier.size(16.dp))
+            Icon(Icons.Filled.GraphicEq, contentDescription = null, tint = AuraBase, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
-            Text("Listen too", style = MaterialTheme.typography.labelLarge, color = Color(0xFF07080F))
+            Text("Listen too", style = MaterialTheme.typography.labelLarge, color = AuraBase)
         }
     }
 }

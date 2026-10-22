@@ -71,6 +71,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.lumisound.android.ui.aura.AuraBase
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -351,7 +352,7 @@ fun NowPlayingContent(
                     Icon(
                         if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                         contentDescription = if (state.isPlaying) "Pause" else "Play",
-                        tint = Color(0xFF07080F),
+                        tint = AuraBase,
                         modifier = Modifier.size(40.dp),
                     )
                 }

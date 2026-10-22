@@ -42,6 +42,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.lumisound.android.ui.aura.AuraBase
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -167,7 +168,7 @@ fun PodcastDetailContent(
                     Modifier
                         .fillMaxWidth()
                         .height(300.dp)
-                        .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.25f), Color(0xFF07080F))))
+                        .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.25f), AuraBase)))
                 )
                 GlassIconButton(Icons.AutoMirrored.Filled.ArrowBack, "Back", Modifier.padding(14.dp), onClick = onBack)
                 Column(Modifier.align(Alignment.BottomCenter).padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {

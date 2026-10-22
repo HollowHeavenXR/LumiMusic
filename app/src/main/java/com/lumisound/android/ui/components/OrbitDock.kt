@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.lumisound.android.ui.aura.AuraBase
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -160,7 +161,7 @@ private fun NowPlayingOrb(playback: PlaybackUiState, onOpen: () -> Unit, onToggl
                 .size(74.dp)
                 .align(Alignment.Center)
                 .clip(CircleShape)
-                .background(Color(0xFF07080F))
+                .background(AuraBase)
                 .clickable(onClick = onOpen),
             contentAlignment = Alignment.Center,
         ) {
@@ -190,7 +191,7 @@ private fun NowPlayingOrb(playback: PlaybackUiState, onOpen: () -> Unit, onToggl
                     .size(26.dp)
                     .clip(CircleShape)
                     .background(Brush.linearGradient(listOf(palette.accent, palette.accent.copy(alpha = 0.8f))))
-                    .border(2.dp, Color(0xFF07080F), CircleShape)
+                    .border(2.dp, AuraBase, CircleShape)
                     .clickable(onClick = onToggle),
                 contentAlignment = Alignment.Center,
             ) {

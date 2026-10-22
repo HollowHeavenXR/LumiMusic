@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.lumisound.android.ui.aura.AuraBase
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -295,9 +296,9 @@ private fun StoryPage(story: Story, s: RewindSummary, period: RewindPeriod, onSh
                     .padding(horizontal = 20.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Filled.Share, contentDescription = null, tint = Color(0xFF07080F), modifier = Modifier.size(18.dp))
+                Icon(Icons.Filled.Share, contentDescription = null, tint = AuraBase, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Share your Rewind", style = MaterialTheme.typography.labelLarge, color = Color(0xFF07080F))
+                Text("Share your Rewind", style = MaterialTheme.typography.labelLarge, color = AuraBase)
             }
         }
     }

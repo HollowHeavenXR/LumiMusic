@@ -13,6 +13,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.lumisound.android.ui.aura.AuraBase
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -94,7 +95,7 @@ fun LumiMusicTheme(
         LumiPalette(
             accent = accent,
             pageTop = accent.copy(alpha = 0.09f).compositeOver(Color(0xFF111528)),
-            pageBottom = Color(0xFF07080F),
+            pageBottom = AuraBase,
             elevatedSurface = Color(0x17FFFFFF),
             hairline = Color(0x1AFFFFFF),
             accentWash = accent.copy(alpha = 0.18f),

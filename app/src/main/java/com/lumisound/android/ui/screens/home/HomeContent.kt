@@ -49,6 +49,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.lumisound.android.ui.aura.AuraBase
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
@@ -365,7 +366,7 @@ private fun LiveFriendBubble(friend: LiveFriend, onClick: () -> Unit) {
                     .clip(CircleShape)
                     .background(Brush.sweepGradient(listOf(palette.accent, Color(0xFF7F5AF0), palette.accent)))
             )
-            Box(Modifier.size(66.dp).clip(CircleShape).background(Color(0xFF07080F)))
+            Box(Modifier.size(66.dp).clip(CircleShape).background(AuraBase))
             Box(Modifier.size(60.dp).clip(CircleShape)) {
                 FallbackArt(friend.name, Modifier.fillMaxSize())
                 friend.avatarModel?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
@@ -376,7 +377,7 @@ private fun LiveFriendBubble(friend: LiveFriend, onClick: () -> Unit) {
                     .size(24.dp)
                     .clip(CircleShape)
                     .background(palette.accent)
-                    .border(2.dp, Color(0xFF07080F), CircleShape),
+                    .border(2.dp, AuraBase, CircleShape),
                 contentAlignment = Alignment.Center,
             ) { EqualizerBars(playing = true, color = Color.White, barWidth = 2.dp, height = 10.dp) }
         }
