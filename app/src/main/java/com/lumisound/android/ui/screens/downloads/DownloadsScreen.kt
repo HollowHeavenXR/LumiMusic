@@ -5,6 +5,8 @@ import androidx.compose.runtime.remember
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DownloadForOffline
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +32,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lumisound.android.AppContainer
+import com.lumisound.android.bridge.BridgeUrls
+import com.lumisound.android.ui.components.Artwork
+import com.lumisound.android.ui.components.EmptyState
+import com.lumisound.android.ui.components.ScreenTitle
+import com.lumisound.android.ui.theme.LocalLumiPalette
 import kotlinx.coroutines.launch
 
 /**
@@ -42,6 +49,14 @@ fun DownloadsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
     val scope = rememberCoroutineScope()
     val downloads by container.database.downloads().observeAll()
         .collectAsStateWithLifecycle(initialValue = emptyList())
+    // DownloadEntity itself carries no title/artist (it's just the on-disk
+    // transfer record) -- the matching cloud_tracks row, keyed by the same
+    // serverPath, is where that metadata actually lives. Without this, every
+    // row below rendered `serverPath.substringAfterLast('/')` -- a raw
+    // filename -- as if it were the track title.
+    val cloudTracksByPath by container.database.cloudTracks().observeAll()
+        .collectAsStateWithLifecycle(initialValue = emptyList())
+    val cloudTrackIndex = remember(cloudTracksByPath) { cloudTracksByPath.associateBy { it.serverPath } }
     val active by container.downloads.active.collectAsStateWithLifecycle()
     val queued by container.downloads.queued.collectAsStateWithLifecycle()
     val offlinePrefs by container.downloads.settings.state.collectAsStateWithLifecycle()
@@ -57,7 +72,7 @@ fun DownloadsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
 
     val totalMb = downloads.sumOf { it.sizeBytes } / 1_048_576
     Column(Modifier.fillMaxSize()) {
-        com.lumisound.android.ui.components.ScreenTitle(
+        ScreenTitle(
             "Offline",
             subtitle = "${downloads.size} tracks · $totalMb MB on this phone",
             eyebrow = "Downloads",
@@ -85,7 +100,7 @@ fun DownloadsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
         )
         active?.let { progress ->
             Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).then(
-                Modifier.background(com.lumisound.android.ui.theme.LocalLumiPalette.current.elevatedSurface, androidx.compose.foundation.shape.RoundedCornerShape(22.dp))
+                Modifier.background(LocalLumiPalette.current.elevatedSurface, RoundedCornerShape(22.dp))
             ).padding(16.dp)) {
                 Text(
                     "Downloading ${progress.title}",
@@ -127,8 +142,8 @@ fun DownloadsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
         }
 
         if (downloads.isEmpty()) {
-            com.lumisound.android.ui.components.EmptyState(
-                icon = androidx.compose.material.icons.Icons.Filled.DownloadForOffline,
+            EmptyState(
+                icon = Icons.Filled.DownloadForOffline,
                 title = "Nothing offline yet",
                 message = "Download tracks from your cloud library and they play here with no connection — still locked to this app.",
             )
@@ -141,22 +156,37 @@ fun DownloadsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
                     Modifier.fillMaxWidth().padding(start = 18.dp, top = 8.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    com.lumisound.android.ui.components.Artwork(
-                        model = com.lumisound.android.bridge.BridgeUrls.cloudArtwork(container.config.baseUrl, download.serverPath),
+                    Artwork(
+                        model = BridgeUrls.cloudArtwork(container.config.baseUrl, download.serverPath),
                         fallbackKey = download.serverPath,
                         size = 48.dp,
                         corner = 13.dp,
                     )
-                    androidx.compose.foundation.layout.Spacer(Modifier.padding(start = 12.dp))
+                    Spacer(Modifier.padding(start = 12.dp))
+                    val track = cloudTrackIndex[download.serverPath]
                     Column(Modifier.weight(1f)) {
                         Text(
-                            download.serverPath.substringAfterLast('/'),
+                            // Falls back to the raw filename only if the cloud
+                            // library entry is gone (e.g. deleted server-side
+                            // since this was downloaded) -- same fallback
+                            // shape as everywhere else that resolves a track
+                            // by serverPath.
+                            track?.title?.takeIf { it.isNotBlank() } ?: download.serverPath.substringAfterLast('/'),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Text(
-                            "${download.sizeBytes / 1_048_576} MB" + if (download.isLocked) " · locked" else "",
+                            buildString {
+                                if (track != null && track.artist.isNotBlank()) {
+                                    append(track.artist)
+                                    append(" · ")
+                                }
+                                append("${download.sizeBytes / 1_048_576} MB")
+                                if (download.isLocked) append(" · locked")
+                            },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

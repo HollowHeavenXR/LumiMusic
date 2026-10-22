@@ -35,6 +35,10 @@ class BridgeConfig(context: Context) {
         }.apply()
     }
 
+    /** Whether a self-hosted key is currently stored -- for the Settings UI to show a state, not the key itself. */
+    val hasSelfHostedKey: Boolean
+        get() = !prefs.getString(KEY_SELF_HOSTED_KEY, null).isNullOrBlank()
+
     fun resetToOfficial() = prefs.edit().remove(KEY_URL).apply()
 
     val isOfficial: Boolean get() = isOfficialBridge(baseUrl)

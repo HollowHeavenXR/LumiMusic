@@ -580,7 +580,7 @@ class ScreenRenderTest {
         SettingsContent(
             SettingsUiState(
                 displayName = "Xenus", username = "xenus", avatarModel = null, officialBridge = true,
-                bridgeUrl = "https://bridge.example", offlineCount = 86, scanLabel = "640 tracks found", version = "LumiMusic 0.6.0 (10)",
+                bridgeUrl = "https://bridge.example", hasSelfHostedKey = false, offlineCount = 86, scanLabel = "640 tracks found", version = "LumiMusic 0.6.0 (10)",
                 galleryLabel = "On · 9 photos from your iPhone",
             ),
             SettingsCallbacks(onBack = {}),

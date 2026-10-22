@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -77,6 +78,7 @@ data class SettingsUiState(
     val avatarModel: Any?,
     val officialBridge: Boolean,
     val bridgeUrl: String,
+    val hasSelfHostedKey: Boolean,
     val offlineCount: Int,
     val scanLabel: String,
     val version: String,
@@ -90,6 +92,15 @@ data class SettingsCallbacks(
     val onSignOut: () -> Unit = {},
     val onRescan: () -> Unit = {},
     val onSaveBridge: (String) -> String = { it },
+    val onSaveSelfHostedKey: (String?) -> Unit = {},
+    // Returns the fresh official URL, same shape as onSaveBridge above --
+    // container.config.baseUrl is a plain SharedPreferences-backed property,
+    // not an observable StateFlow, so nothing recomposes this screen just
+    // because it changed underneath it. Threading the fresh value back
+    // through the return is how onSaveBridge already copes with that; this
+    // needs the same treatment or the text field would keep showing the
+    // just-abandoned custom URL until something unrelated forced a redraw.
+    val onResetBridge: () -> String = { "" },
 )
 
 @Composable
@@ -114,6 +125,7 @@ fun SettingsScreen(
             avatarModel = user?.id?.let { BridgeUrls.avatar(container.config.baseUrl, it) },
             officialBridge = container.config.isOfficial,
             bridgeUrl = container.config.baseUrl,
+            hasSelfHostedKey = container.config.hasSelfHostedKey,
             offlineCount = downloads.size,
             scanLabel = when {
                 scanState.running -> "Scanning…"
@@ -144,6 +156,11 @@ fun SettingsScreen(
                 container.config.baseUrl = url
                 container.config.baseUrl
             },
+            onSaveSelfHostedKey = { key -> container.config.setSelfHostedKey(key) },
+            onResetBridge = {
+                container.config.resetToOfficial()
+                container.config.baseUrl
+            },
         ),
     )
 }
@@ -162,6 +179,23 @@ fun SettingsContent(state: SettingsUiState, callbacks: SettingsCallbacks) {
     var bridgeUrl by remember(state.bridgeUrl) { mutableStateOf(state.bridgeUrl) }
     var editingBridge by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf<String?>(null) }
+    // The "Connection" group below (self-hosted bridge URL/key) used to be an
+    // always-visible top-level settings group — confusing noise for the 99%
+    // of users who will never touch it, and a stray "server" field reading
+    // as an unfinished/debug leftover to anyone who does notice it. Unlike
+    // iOS's equivalent override (hidden behind `#if DEBUG`, dev-only there),
+    // self-hosting is a real, intentionally-supported end-user feature here
+    // (see `BridgeConfig`'s own doc comment) — so it can't just be deleted
+    // or hidden in release builds the same way. Instead it's revealed the
+    // way Android's own system Settings reveals Developer Options: tap the
+    // version string a few times. Someone who has ALREADY pointed this
+    // install at a custom bridge sees it unconditionally, so a real
+    // self-hoster never has to rediscover the tap each time they open
+    // Settings — only someone on the default/official bridge needs to.
+    var connectionTapCount by remember { mutableStateOf(0) }
+    var connectionUnlocked by remember { mutableStateOf(false) }
+    val showConnection = connectionUnlocked || !state.officialBridge || BuildConfig.DEBUG
+    var selfHostedKey by remember { mutableStateOf("") }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 28.dp)) {
         ScreenTitle("Settings", eyebrow = "You", onBack = callbacks.onBack)
@@ -207,13 +241,18 @@ fun SettingsContent(state: SettingsUiState, callbacks: SettingsCallbacks) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 24.dp, top = 24.dp, bottom = 10.dp),
         )
+        // "Diagnostics" used to sit here too, with equal visual weight to
+        // the five things people actually open Settings for — a raw-log/
+        // HTTP-latency screen presented as if it were a normal feature on
+        // par with the equalizer or stats. Moved to its own "Advanced"
+        // group further down, still reachable in one tap, just no longer
+        // implying it's everyday business.
         val controls = listOf(
             Control("Equalizer", "Hardware bands", Icons.Filled.Equalizer, SectionTint.Offline, Route.Equalizer),
             Control("Offline", "${state.offlineCount} saved", Icons.Filled.DownloadForOffline, SectionTint.Library, Route.Downloads),
             Control("Scrobbling", "Last.fm · ListenBrainz", Icons.Filled.Sync, SectionTint.Recent, Route.Scrobbling),
             Control("Inbox", "Notifications", Icons.Filled.Notifications, SectionTint.Favorites, Route.Notifications),
             Control("Stats", "Your report", Icons.Filled.BarChart, SectionTint.Playlists, Route.Stats),
-            Control("Diagnostics", "Logs & reports", Icons.Filled.BugReport, SectionTint.Device, Route.Diagnostics),
         )
         Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             controls.chunked(3).forEach { row ->
@@ -261,38 +300,82 @@ fun SettingsContent(state: SettingsUiState, callbacks: SettingsCallbacks) {
         }
 
         Spacer(Modifier.height(22.dp))
-        SettingsGroup("Connection") {
+        SettingsGroup("Advanced") {
             SettingsRow(
-                icon = Icons.Filled.Dns,
-                title = "Bridge",
-                subtitle = if (state.officialBridge) "Official bridge" else state.bridgeUrl,
-                onClick = { editingBridge = !editingBridge },
+                Icons.Filled.BugReport,
+                "Diagnostics",
+                "Logs, HTTP routes & reports",
+                onClick = { callbacks.onOpen(Route.Diagnostics) },
             )
-            if (editingBridge) {
-                Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    OutlinedTextField(
-                        value = bridgeUrl,
-                        onValueChange = { bridgeUrl = it },
-                        label = { Text("Bridge URL") },
-                        singleLine = true,
-                        shape = MaterialTheme.shapes.small,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Button(
-                        onClick = {
-                            bridgeUrl = callbacks.onSaveBridge(bridgeUrl)
-                            editingBridge = false
-                            note = "Saved. Sign out and back in if you changed servers."
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Save bridge URL") }
-                    Text(
-                        "A self-hosted bridge never receives the official shared key.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 6.dp),
-                    )
+        }
+
+        if (showConnection) {
+            Spacer(Modifier.height(22.dp))
+            SettingsGroup("Connection") {
+                SettingsRow(
+                    icon = Icons.Filled.Dns,
+                    title = "Bridge",
+                    subtitle = if (state.officialBridge) "Official bridge" else state.bridgeUrl,
+                    onClick = { editingBridge = !editingBridge },
+                )
+                if (editingBridge) {
+                    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        OutlinedTextField(
+                            value = bridgeUrl,
+                            onValueChange = { bridgeUrl = it },
+                            label = { Text("Bridge URL") },
+                            singleLine = true,
+                            shape = MaterialTheme.shapes.small,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick = {
+                                bridgeUrl = callbacks.onSaveBridge(bridgeUrl)
+                                editingBridge = false
+                                note = "Saved. Sign out and back in if you changed servers."
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Save bridge URL") }
+                        if (!state.officialBridge) {
+                            Spacer(Modifier.height(16.dp))
+                            Text(
+                                "A self-hosted bridge never receives the official shared key — " +
+                                    "its own key, if it has one, goes here. Without it, search, " +
+                                    "streaming, downloads, lyrics and radio will 401.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = selfHostedKey,
+                                onValueChange = { selfHostedKey = it },
+                                label = { Text(if (state.hasSelfHostedKey) "Replace self-hosted key" else "Self-hosted key") },
+                                placeholder = { Text(if (state.hasSelfHostedKey) "A key is set — leave blank to clear it" else "") },
+                                singleLine = true,
+                                shape = MaterialTheme.shapes.small,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Button(
+                                onClick = {
+                                    callbacks.onSaveSelfHostedKey(selfHostedKey.ifBlank { null })
+                                    note = if (selfHostedKey.isBlank()) "Self-hosted key cleared." else "Self-hosted key saved."
+                                    selfHostedKey = ""
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text("Save key") }
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    bridgeUrl = callbacks.onResetBridge()
+                                    editingBridge = false
+                                    note = "Back to the official bridge. Sign out and back in."
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text("Reset to official bridge") }
+                        }
+                    }
                 }
             }
         }
@@ -307,7 +390,18 @@ fun SettingsContent(state: SettingsUiState, callbacks: SettingsCallbacks) {
             state.version,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth()
+                .clickable(enabled = !showConnection) {
+                    connectionTapCount += 1
+                    note = when {
+                        connectionTapCount >= 7 -> {
+                            connectionUnlocked = true
+                            "Connection settings unlocked."
+                        }
+                        connectionTapCount >= 4 -> "${7 - connectionTapCount} more taps to reveal connection settings."
+                        else -> null
+                    }
+                },
             textAlign = TextAlign.Center,
         )
     }

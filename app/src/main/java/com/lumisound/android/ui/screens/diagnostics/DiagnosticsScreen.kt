@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -41,6 +40,8 @@ import com.lumisound.android.AppContainer
 import com.lumisound.android.BuildConfig
 import com.lumisound.android.bridge.api.BugReportBody
 import com.lumisound.android.diagnostics.AppLogger
+import com.lumisound.android.ui.components.ScreenTitle
+import com.lumisound.android.ui.components.SettingsGroup
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -77,132 +78,146 @@ fun DiagnosticsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
-        com.lumisound.android.ui.components.ScreenTitle(
+        ScreenTitle(
             "Diagnostics",
             subtitle = "Live state, logs, and a way to report a problem",
             eyebrow = "Support",
             onBack = onBack,
         )
-        Column(Modifier.padding(horizontal = 16.dp)) {
-        Text("Build", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "LumiMusic ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) " +
-                "${if (BuildConfig.DEBUG) "debug" else "release"}\n" +
-                "${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
 
-        Spacer(Modifier.height(16.dp))
-        Text("Live state", style = MaterialTheme.typography.titleMedium)
-        Text(
-            buildString {
-                appendLine("player connected: ${playback.connected}")
-                appendLine("playing: ${playback.isPlaying} · queue ${playback.queueIndex + 1}/${playback.queueSize}")
-                appendLine("source: ${if (playback.isLocalSource) "device file" else "bridge stream"}")
-                playback.playbackError?.let { appendLine("player error: $it") }
-                appendLine("errors logged: ${AppLogger.errorCount()}")
-            },
-            style = MaterialTheme.typography.bodySmall,
-            fontFamily = FontFamily.Monospace,
-        )
+        Spacer(Modifier.height(10.dp))
+        SettingsGroup("Build") {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+                Text(
+                    "LumiMusic ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) " +
+                        "${if (BuildConfig.DEBUG) "debug" else "release"}\n" +
+                        "${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
 
-        Spacer(Modifier.height(16.dp))
-        Text("HTTP routes", style = MaterialTheme.typography.titleMedium)
-        val routes = container.httpMetrics.snapshot()
-        if (routes.isEmpty()) {
-            Text("No requests yet.", style = MaterialTheme.typography.bodySmall)
-        } else {
-            Column(Modifier.horizontalScroll(rememberScrollState())) {
-                routes.entries.sortedByDescending { it.value.failures }.forEach { (route, stat) ->
-                    Text(
-                        "%-42s %4d calls  %3d fail  last %s  avg %4dms  max %5dms".format(
-                            route.take(42), stat.calls, stat.failures, stat.lastStatus ?: "-", stat.averageMs, stat.slowestMs,
-                        ),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontFamily = FontFamily.Monospace,
-                        color = if (stat.failures > 0) MaterialTheme.colorScheme.error
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+        Spacer(Modifier.height(18.dp))
+        SettingsGroup("Live state") {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+                Text(
+                    buildString {
+                        appendLine("player connected: ${playback.connected}")
+                        appendLine("playing: ${playback.isPlaying} · queue ${playback.queueIndex + 1}/${playback.queueSize}")
+                        appendLine("source: ${if (playback.isLocalSource) "device file" else "bridge stream"}")
+                        playback.playbackError?.let { appendLine("player error: $it") }
+                        appendLine("errors logged: ${AppLogger.errorCount()}")
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(18.dp))
+        SettingsGroup("HTTP routes") {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+                val routes = container.httpMetrics.snapshot()
+                if (routes.isEmpty()) {
+                    Text("No requests yet.", style = MaterialTheme.typography.bodySmall)
+                } else {
+                    Column(Modifier.horizontalScroll(rememberScrollState())) {
+                        routes.entries.sortedByDescending { it.value.failures }.forEach { (route, stat) ->
+                            Text(
+                                "%-42s %4d calls  %3d fail  last %s  avg %4dms  max %5dms".format(
+                                    route.take(42), stat.calls, stat.failures, stat.lastStatus ?: "-", stat.averageMs, stat.slowestMs,
+                                ),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                color = if (stat.failures > 0) MaterialTheme.colorScheme.error
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = {
+                        container.diagnostics.sendNow("manual")
+                        container.telemetry.flushNow()
+                        note = "Snapshot and log batch sent."
+                    }) { Text("Send diagnostics") }
+                    OutlinedButton(onClick = {
+                        copyToClipboard(context, "LumiMusic diagnostics", diagnosticsText(snapshot, logText))
+                        note = "Copied to clipboard."
+                    }) { Text("Copy report") }
                 }
             }
         }
 
-        Spacer(Modifier.height(16.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = {
-                container.diagnostics.sendNow("manual")
-                container.telemetry.flushNow()
-                note = "Snapshot and log batch sent."
-            }) { Text("Send diagnostics") }
-            OutlinedButton(onClick = {
-                copyToClipboard(context, "LumiMusic diagnostics", diagnosticsText(snapshot, logText))
-                note = "Copied to clipboard."
-            }) { Text("Copy report") }
-        }
+        Spacer(Modifier.height(18.dp))
+        SettingsGroup("Report a problem") {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+                Text(
+                    "Sent to the bridge with the last 200 log lines attached.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = reportText,
+                    onValueChange = { reportText = it },
+                    label = { Text("What happened?") },
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    enabled = reportText.isNotBlank(),
+                    onClick = {
+                        val description = reportText
+                        reportText = ""
+                        scope.launch {
+                            note = try {
+                                container.http.diagnostics.bugReport(
+                                    BugReportBody(
+                                        category = "android",
+                                        description = description,
+                                        appVersion = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                                        deviceInfo = "${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE}",
+                                        recentLogs = AppLogger.asText(200).take(20_000),
+                                    )
+                                )
+                                "Report sent. Thanks."
+                            } catch (e: Exception) {
+                                "Could not send the report: ${e.javaClass.simpleName}"
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Send report") }
 
-        Spacer(Modifier.height(16.dp))
-        HorizontalDivider()
-        Spacer(Modifier.height(16.dp))
-
-        Text("Report a problem", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "Sent to the bridge with the last 200 log lines attached.",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(8.dp))
-        OutlinedTextField(
-            value = reportText,
-            onValueChange = { reportText = it },
-            label = { Text("What happened?") },
-            minLines = 3,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(8.dp))
-        Button(
-            enabled = reportText.isNotBlank(),
-            onClick = {
-                val description = reportText
-                reportText = ""
-                scope.launch {
-                    note = try {
-                        container.http.diagnostics.bugReport(
-                            BugReportBody(
-                                category = "android",
-                                description = description,
-                                appVersion = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-                                deviceInfo = "${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE}",
-                                recentLogs = AppLogger.asText(200).take(20_000),
-                            )
-                        )
-                        "Report sent. Thanks."
-                    } catch (e: Exception) {
-                        "Could not send the report: ${e.javaClass.simpleName}"
-                    }
+                note?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 }
-            },
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("Send report") }
-
-        note?.let {
-            Spacer(Modifier.height(8.dp))
-            Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            }
         }
 
-        Spacer(Modifier.height(16.dp))
-        HorizontalDivider()
-        Spacer(Modifier.height(16.dp))
-
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("Log", style = MaterialTheme.typography.titleMedium)
-            TextButton(onClick = {
-                copyToClipboard(context, "LumiMusic log", logText)
-                note = "Log copied."
-            }) { Text("Copy log") }
+        Spacer(Modifier.height(18.dp))
+        SettingsGroup("Log") {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(
+                        "Last 200 lines",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    TextButton(onClick = {
+                        copyToClipboard(context, "LumiMusic log", logText)
+                        note = "Log copied."
+                    }) { Text("Copy log") }
+                }
+                LogTail(logText)
+            }
         }
-        LogTail(logText)
-        }
+        Spacer(Modifier.height(24.dp))
     }
 }
 
