@@ -228,6 +228,17 @@ class PlayerController(
     }
 
     /**
+     * 0..1 -- ExoPlayer's native stream-volume range. iOS's AudioSettings.volume
+     * allows up to 4.0 via a separate `AVAudioUnitEQ.globalGain` boost stage this
+     * app has no equivalent of; a value above 1.0 synced from there is simply not
+     * representable here (see AudioSettingsSyncService, which only ever calls
+     * this with values already clamped to the overlapping range).
+     */
+    fun setVolume(volume: Float) {
+        controller?.volume = volume.coerceIn(0f, 1f)
+    }
+
+    /**
      * Pauses after [minutes], or when the current track ends if [minutes] is null and
      * [endOfTrack] is set. Either call replaces whatever timer was running; [cancelSleepTimer]
      * clears it. The timer lives in the app process with the controller, not the service:

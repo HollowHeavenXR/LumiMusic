@@ -136,6 +136,37 @@ class EqualizerController(private val context: Context) {
         publish()
     }
 
+    /**
+     * Approximates a curve defined at [sourceFrequenciesHz] (dB values in
+     * [sourceLevelsDb], same length/order) onto this device's own hardware
+     * bands by nearest-frequency lookup -- used to apply iOS's fixed 10-band
+     * AudioSettings.eqBands curve (see AudioSettingsSyncService) onto
+     * whatever bands this specific device actually has, which rarely match
+     * iOS's set exactly (Android's Equalizer reports its own band count and
+     * centre frequencies per device). Read-only application of an external
+     * curve: this device's resulting band levels are never translated back
+     * into [sourceFrequenciesHz]'s shape anywhere, because they have no
+     * fixed, cross-device meaning the way iOS's 10 bands do.
+     */
+    fun applyMappedCurve(sourceFrequenciesHz: List<Int>, sourceLevelsDb: List<Float>) {
+        val eq = equalizer ?: return
+        if (sourceFrequenciesHz.isEmpty() || sourceFrequenciesHz.size != sourceLevelsDb.size) return
+        runCatching {
+            for (band in 0 until eq.numberOfBands) {
+                val centerHz = eq.getCenterFreq(band.toShort()) / 1000
+                val nearest = sourceFrequenciesHz.indices
+                    .minByOrNull { kotlin.math.abs(sourceFrequenciesHz[it] - centerHz) } ?: continue
+                val millibel = (sourceLevelsDb[nearest] * 100).toInt()
+                    .coerceIn(eq.bandLevelRange[0].toInt(), eq.bandLevelRange[1].toInt())
+                eq.setBandLevel(band.toShort(), millibel.toShort())
+                prefs.edit().putInt("$KEY_BAND$band", millibel).apply()
+            }
+            // A synced curve isn't any locally-named preset.
+            prefs.edit().putInt(KEY_PRESET, -1).apply()
+        }
+        publish()
+    }
+
     fun release() {
         runCatching { equalizer?.release() }
         runCatching { enhancer?.release() }

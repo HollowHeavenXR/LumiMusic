@@ -8,6 +8,7 @@ import com.lumisound.android.cloud.ArtworkWarmer
 import com.lumisound.android.gallery.GalleryBackgroundStore
 import android.content.Context
 import com.lumisound.android.audio.AudioSessionHolder
+import com.lumisound.android.audio.AudioSettingsSyncService
 import com.lumisound.android.audio.EqualizerController
 import com.lumisound.android.bridge.AccountRepository
 import com.lumisound.android.bridge.BridgeConfig
@@ -68,6 +69,7 @@ class AppContainer(private val context: Context) {
     val artworkWarmer by lazy { ArtworkWarmer(context, database, config, scope) }
     val equalizer by lazy { EqualizerController(context) }
     val player by lazy { PlayerController(context, config, scope) }
+    val audioSync by lazy { AudioSettingsSyncService(http, equalizer, player, scope) }
     val lyrics by lazy { LyricsRepository(http) }
     val searchHistory by lazy { SearchHistoryStore(context) }
     val presence by lazy { PresenceService(http, tokenStore, player, scope) }

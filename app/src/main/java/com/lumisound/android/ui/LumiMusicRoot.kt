@@ -131,6 +131,15 @@ private fun SignedInShell(container: AppContainer) {
     LaunchedEffect(lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { container.cloudImport.refreshAccentIfStale() }
     }
+    // Speed/equalizer/bass-boost set on another device (iOS, or a reinstall here)
+    // used to sit in `audio_settings_json` completely unread by this app -- see
+    // AudioSettingsSyncService's doc comment for which fields actually apply here
+    // and why the rest can't. Same trigger/cadence as the two syncs above; the
+    // push side (local changes going back out) runs continuously from the
+    // service's own init, not from this lifecycle hook.
+    LaunchedEffect(lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { container.audioSync.pullAndApplyIfStale() }
+    }
 
     CompositionLocalProvider(LocalAura provides aura) {
         AuraBackdrop(
