@@ -47,6 +47,7 @@ import com.lumisound.android.ui.screens.library.FavoritesScreen
 import com.lumisound.android.ui.screens.library.LibraryHomeScreen
 import com.lumisound.android.ui.screens.library.LibrarySection
 import com.lumisound.android.ui.screens.library.PlaylistsScreen
+import com.lumisound.android.ui.screens.library.SmartPlaylistsScreen
 import com.lumisound.android.ui.screens.notifications.NotificationsScreen
 import com.lumisound.android.ui.screens.nowplaying.NowPlayingSheet
 import com.lumisound.android.ui.screens.podcasts.PodcastDetailScreen
@@ -239,6 +240,7 @@ private fun Screen(
             LibrarySection.Device -> DeviceLibraryScreen(container, onBack = pop)
             LibrarySection.Favorites -> FavoritesScreen(container, onBack = pop)
             LibrarySection.Playlists -> PlaylistsScreen(container, onBack = pop, initialPlaylistId = key.playlistId)
+            LibrarySection.SmartPlaylists -> SmartPlaylistsScreen(container, onBack = pop)
             LibrarySection.Podcasts -> PodcastsScreen(container, onOpen = push, onBack = pop)
         }
         Route.Equalizer -> EqualizerScreen(container, onBack = pop)

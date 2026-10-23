@@ -31,6 +31,7 @@ import com.lumisound.android.diagnostics.TelemetryUploader
 import com.lumisound.android.download.DownloadManager
 import com.lumisound.android.library.FolderCoverArtStore
 import com.lumisound.android.library.LibraryScanner
+import com.lumisound.android.library.SmartPlaylistStore
 import com.lumisound.android.lyrics.LyricsRepository
 import com.lumisound.android.playback.PlayHistoryLogger
 import com.lumisound.android.playback.PlayerController
@@ -68,6 +69,7 @@ class AppContainer(private val context: Context) {
     val libraryRepository by lazy { LibraryRepository(http, database, remoteLogger) }
     val libraryScanner by lazy { LibraryScanner(context, database, remoteLogger) }
     val folderCoverArt by lazy { FolderCoverArtStore(context) }
+    val smartPlaylists by lazy { SmartPlaylistStore(context) }
     val downloads by lazy { DownloadManager(context, http, config, database, remoteLogger, scope) }
     val artworkWarmer by lazy { ArtworkWarmer(context, database, config, scope) }
     val equalizer by lazy { EqualizerController(context) }

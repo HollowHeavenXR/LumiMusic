@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Favorite
@@ -52,6 +53,7 @@ enum class LibrarySection(val label: String, val icon: ImageVector) {
     Cloud("Cloud", Icons.Filled.CloudQueue),
     Favorites("Favorites", Icons.Filled.Favorite),
     Playlists("Playlists", Icons.Filled.QueueMusic),
+    SmartPlaylists("Smart Playlists", Icons.Filled.AutoAwesome),
     Offline("Offline", Icons.Filled.DownloadDone),
     Device("This phone", Icons.Filled.PhoneAndroid),
     Podcasts("Podcasts", Icons.Filled.Podcasts),
@@ -144,7 +146,7 @@ fun LibraryHomeContent(
 
 private fun countLabel(section: LibrarySection, count: Int): String = when (section) {
     LibrarySection.Podcasts -> "$count show${if (count == 1) "" else "s"}"
-    LibrarySection.Playlists -> "$count playlist${if (count == 1) "" else "s"}"
+    LibrarySection.Playlists, LibrarySection.SmartPlaylists -> "$count playlist${if (count == 1) "" else "s"}"
     else -> "$count track${if (count == 1) "" else "s"}"
 }
 
@@ -157,6 +159,7 @@ fun LibraryHomeScreen(container: AppContainer, onOpen: (LibrarySection) -> Unit,
     val recent by db.cloudTracks().observeRecentlyAdded(16).collectAsStateWithLifecycle(initialValue = emptyList())
     val favorites by db.favorites().observeIds().collectAsStateWithLifecycle(initialValue = emptyList())
     val playlists by db.playlists().observeAll().collectAsStateWithLifecycle(initialValue = emptyList())
+    val smartPlaylists by container.smartPlaylists.playlists.collectAsStateWithLifecycle()
     val offline by db.downloads().observePaths().collectAsStateWithLifecycle(initialValue = emptyList())
     val device by db.localTracks().observeAll().collectAsStateWithLifecycle(initialValue = emptyList())
     val shows = rememberLoadable(Unit, "library.shows") { container.http.podcasts.subscriptions().size }
@@ -167,6 +170,7 @@ fun LibraryHomeScreen(container: AppContainer, onOpen: (LibrarySection) -> Unit,
                 put(LibrarySection.Cloud, cloud.size)
                 put(LibrarySection.Favorites, favorites.size)
                 put(LibrarySection.Playlists, playlists.size)
+                put(LibrarySection.SmartPlaylists, smartPlaylists.size)
                 put(LibrarySection.Offline, offline.size)
                 put(LibrarySection.Device, device.size)
                 shows.state.valueOrNull?.let { put(LibrarySection.Podcasts, it) }
