@@ -1,6 +1,7 @@
 package com.lumisound.android.ui.screens.device
 
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -32,6 +34,7 @@ import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import com.lumisound.android.ui.components.Artwork
 import com.lumisound.android.ui.components.ChipRow
 import com.lumisound.android.ui.components.GlassButton
 import com.lumisound.android.ui.components.ScreenTitle
@@ -198,6 +201,51 @@ fun DeviceLibraryScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
 
         val showingGroupList = grouping != Grouping.Songs && openGroup == null && query.isBlank()
         if (showingGroupList) {
+            if (grouping == Grouping.Folders) {
+                val coverChangeCount by container.folderCoverArt.changeCount.collectAsStateWithLifecycle()
+                var pickingCoverFor by remember { mutableStateOf<String?>(null) }
+                val pickCover = rememberLauncherForActivityResult(
+                    ActivityResultContracts.PickVisualMedia(),
+                ) { uri ->
+                    val folder = pickingCoverFor
+                    pickingCoverFor = null
+                    if (uri != null && folder != null) container.folderCoverArt.setCover(folder, uri)
+                }
+                LazyColumn(Modifier.fillMaxSize()) {
+                    items(groups, key = { it }) { group ->
+                        val cover = remember(group, coverChangeCount) { container.folderCoverArt.cover(group) }
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { openGroup = group }
+                                .padding(horizontal = 20.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+                                if (cover != null) {
+                                    Artwork(cover, group, 44.dp, corner = 10.dp)
+                                } else {
+                                    Icon(Icons.Filled.Folder, contentDescription = null, tint = palette.accent)
+                                }
+                            }
+                            Spacer(Modifier.padding(start = 6.dp))
+                            OneLine(
+                                group.ifBlank { "Unknown" },
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.weight(1f).padding(start = 8.dp),
+                            )
+                            TextButton(onClick = {
+                                pickingCoverFor = group
+                                pickCover.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            }) { Text(if (cover != null) "Change cover" else "Set cover") }
+                            if (cover != null) {
+                                TextButton(onClick = { container.folderCoverArt.removeCover(group) }) { Text("Remove") }
+                            }
+                        }
+                    }
+                }
+                return@Column
+            }
             LazyColumn(Modifier.fillMaxSize()) {
                 items(groups, key = { it }) { group ->
                     OneLine(
