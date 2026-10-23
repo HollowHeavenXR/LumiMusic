@@ -2,6 +2,7 @@ package com.lumisound.android.bridge.api
 
 import com.lumisound.android.bridge.model.EpisodeProgressDto
 import com.lumisound.android.bridge.model.EpisodeProgressRequest
+import com.lumisound.android.bridge.model.PodcastChapterDto
 import com.lumisound.android.bridge.model.PodcastEpisodeDto
 import com.lumisound.android.bridge.model.PodcastShowDto
 import com.lumisound.android.bridge.model.PodcastSubscribeRequest
@@ -48,4 +49,8 @@ interface PodcastApi {
 
     @PUT("user/podcasts/episode-progress")
     suspend fun saveProgress(@Body body: EpisodeProgressRequest)
+
+    /** On-demand, not inlined into [episodes] -- most episodes never get this opened. */
+    @GET("user/podcasts/chapters")
+    suspend fun chapters(@Query("chapters_url") chaptersUrl: String): List<PodcastChapterDto>
 }

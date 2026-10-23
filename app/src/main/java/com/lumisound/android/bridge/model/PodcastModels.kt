@@ -46,6 +46,13 @@ data class EpisodeProgressDto(
     @SerializedName("updated_at") val updatedAt: String? = null,
 )
 
+/** `GET /user/podcasts/chapters` -- the bridge fetches+reshapes the episode's Podcasting 2.0 chapters file. */
+data class PodcastChapterDto(
+    @SerializedName("start_time_seconds") val startTimeSeconds: Double = 0.0,
+    val title: String = "",
+    @SerializedName("image_url") val imageUrl: String? = null,
+)
+
 data class EpisodeProgressRequest(
     @SerializedName("feed_url") val feedUrl: String,
     @SerializedName("episode_guid") val episodeGuid: String,

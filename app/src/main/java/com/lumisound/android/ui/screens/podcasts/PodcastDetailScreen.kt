@@ -24,13 +24,16 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lumisound.android.AppContainer
 import com.lumisound.android.bridge.model.EpisodeProgressDto
+import com.lumisound.android.bridge.model.PodcastChapterDto
 import com.lumisound.android.bridge.model.PodcastEpisodeDto
 import com.lumisound.android.bridge.model.PodcastSubscribeRequest
 import com.lumisound.android.bridge.model.PodcastSubscriptionDto
@@ -111,6 +115,15 @@ fun PodcastDetailScreen(
         container.player.play(playables, index, resumeAt)
     }
 
+    fun playFromChapter(list: List<PodcastEpisodeDto>, episode: PodcastEpisodeDto, startTimeSeconds: Double) {
+        val playables = list.mapNotNull { it.toPlayable(feedUrl, title, artworkUrl) }
+        val guid = episode.guid ?: episode.audioUrl
+        val index = playables.indexOfFirst { it.episodeGuid == guid }
+        if (index < 0) return
+        container.player.setShuffle(false)
+        container.player.play(playables, index, (startTimeSeconds * 1000).toLong())
+    }
+
     PodcastDetailContent(
         title = title,
         feedUrl = feedUrl,
@@ -123,6 +136,8 @@ fun PodcastDetailScreen(
         onRetry = episodes::reload,
         onPlay = ::play,
         onPlayNext = { episode -> episode.toPlayable(feedUrl, title, artworkUrl)?.let { container.player.playNext(it) } },
+        onPlayFromChapter = { episode, startTimeSeconds -> playFromChapter(episodes.state.valueOrNull.orEmpty(), episode, startTimeSeconds) },
+        onFetchChapters = { url -> api.chapters(url) },
         onToggleFollow = { sub ->
             scope.launch {
                 try {
@@ -156,6 +171,8 @@ fun PodcastDetailContent(
     onPlay: (List<PodcastEpisodeDto>, PodcastEpisodeDto, Boolean) -> Unit,
     onPlayNext: (PodcastEpisodeDto) -> Unit,
     onToggleFollow: (PodcastSubscriptionDto?) -> Unit,
+    onPlayFromChapter: (PodcastEpisodeDto, Double) -> Unit,
+    onFetchChapters: suspend (String) -> List<PodcastChapterDto>,
 ) {
     val list = episodes.valueOrNull.orEmpty()
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 28.dp)) {
@@ -213,6 +230,8 @@ fun PodcastDetailContent(
                 onPlay = { onPlay(list, episode, false) },
                 onFromStart = { onPlay(list, episode, true) },
                 onPlayNext = { onPlayNext(episode) },
+                onPlayFromChapter = { startTimeSeconds -> onPlayFromChapter(episode, startTimeSeconds) },
+                onFetchChapters = onFetchChapters,
             )
         }
     }
@@ -226,9 +245,12 @@ private fun EpisodeCard(
     onPlay: () -> Unit,
     onFromStart: () -> Unit,
     onPlayNext: () -> Unit,
+    onPlayFromChapter: (Double) -> Unit,
+    onFetchChapters: suspend (String) -> List<PodcastChapterDto>,
 ) {
     val palette = LocalLumiPalette.current
     var menuOpen by remember { mutableStateOf(false) }
+    var chaptersOpen by remember { mutableStateOf(false) }
     val fraction = progress?.takeIf { !it.completed && it.durationSeconds > 0 }?.let { (it.positionSeconds / it.durationSeconds).toFloat() } ?: 0f
     LumiCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp), onClick = onPlay, corner = 20.dp) {
         Row(Modifier.padding(start = 14.dp, top = 12.dp, bottom = 12.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -268,10 +290,74 @@ private fun EpisodeCard(
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     DropdownMenuItem(text = { Text("Play from the start") }, onClick = { menuOpen = false; onFromStart() })
                     DropdownMenuItem(text = { Text("Play next") }, onClick = { menuOpen = false; onPlayNext() })
+                    if (!episode.chaptersUrl.isNullOrBlank()) {
+                        DropdownMenuItem(text = { Text("Chapters") }, onClick = { menuOpen = false; chaptersOpen = true })
+                    }
                 }
             }
         }
     }
+
+    val chaptersUrl = episode.chaptersUrl
+    if (chaptersOpen && chaptersUrl != null) {
+        ChaptersDialog(
+            chaptersUrl = chaptersUrl,
+            onFetch = onFetchChapters,
+            onSelect = { chapter -> chaptersOpen = false; onPlayFromChapter(chapter.startTimeSeconds) },
+            onDismiss = { chaptersOpen = false },
+        )
+    }
+}
+
+/**
+ * Fetches fresh every time it opens -- same choice iOS made (no cache keyed by
+ * episode/URL either) -- a chapters file is small and rarely-opened enough
+ * that staleness risk isn't worth a cache invalidation story.
+ */
+@Composable
+private fun ChaptersDialog(
+    chaptersUrl: String,
+    onFetch: suspend (String) -> List<PodcastChapterDto>,
+    onSelect: (PodcastChapterDto) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var chapters by remember { mutableStateOf<Loadable<List<PodcastChapterDto>>>(Loadable.Loading) }
+    LaunchedEffect(chaptersUrl) {
+        chapters = try {
+            Loadable.Ready(onFetch(chaptersUrl))
+        } catch (e: Exception) {
+            Loadable.Failed(friendlyError(e))
+        }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Chapters") },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        text = {
+            LoadableSection(chapters, onRetry = {}) { list ->
+                if (list.isEmpty()) {
+                    Text("This episode has no chapter markers.", style = MaterialTheme.typography.bodyMedium)
+                } else {
+                    Column {
+                        list.forEach { chapter ->
+                            Row(
+                                Modifier.fillMaxWidth().clickable { onSelect(chapter) }.padding(vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    chapter.startTimeSeconds.toInt().let { "%d:%02d".format(it / 60, it % 60) },
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = LocalLumiPalette.current.accent,
+                                    modifier = Modifier.width(52.dp),
+                                )
+                                Text(chapter.title, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+    )
 }
 
 /** Feed descriptions are HTML; a teaser wants the words only. */
