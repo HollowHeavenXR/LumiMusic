@@ -18,11 +18,11 @@ import kotlinx.coroutines.flow.onEach
 
 /**
  * Round-trips the handful of `AudioSettings` fields this app can actually act
- * on (speed, volume, equalizer on/off, bass boost, mono downmix) through the
- * same `audio_settings_json` blob Lumisound (iOS) writes -- a free-form JSON
- * object this class neither owns nor fully understands the shape of: pitch,
- * reverb, 8D audio, spatial audio, and crossfade still have no Android
- * equivalent. Every write here reads the CURRENT blob
+ * on (speed, pitch, volume, equalizer on/off, bass boost, reverb, mono
+ * downmix) through the same `audio_settings_json` blob Lumisound (iOS)
+ * writes -- a free-form JSON object this class neither owns nor fully
+ * understands the shape of: 8D audio, spatial audio, and crossfade still
+ * have no Android equivalent. Every write here reads the CURRENT blob
  * first and only overwrites the handful of keys below (see [push]), so an
  * Android-side change never wipes an iOS-only field it has no way to
  * represent, and the reverse holds too: pulling a blob shaped by fields this
@@ -68,6 +68,13 @@ class AudioSettingsSyncService(
             .debounce(800)
             .onEach { if (!applyingRemote) push() }
             .launchIn(scope)
+        player.state
+            .map { it.pitchSemitones }
+            .distinctUntilChanged()
+            .drop(1)
+            .debounce(800)
+            .onEach { if (!applyingRemote) push() }
+            .launchIn(scope)
         monoDownmix.enabled
             .drop(1)
             .debounce(800)
@@ -95,6 +102,7 @@ class AudioSettingsSyncService(
             applyingRemote = true
             try {
                 obj.floatOrNull("speed")?.let { player.setSpeed(it) }
+                obj.floatOrNull("pitchSemitones")?.let { player.setPitchSemitones(it) }
                 // Only the overlapping 0..1 range is honored -- see
                 // PlayerController.setVolume's doc comment for why a value
                 // above 1.0 (iOS's separate boost stage) can't be synced here.
@@ -132,6 +140,7 @@ class AudioSettingsSyncService(
                 ?: JsonObject()
             val eq = equalizer.state.value
             obj.addProperty("speed", player.state.value.speed)
+            obj.addProperty("pitchSemitones", player.state.value.pitchSemitones)
             obj.addProperty("equalizerEnabled", eq.enabled)
             obj.addProperty("bassBoostEnabled", eq.bassBoostMillibel > 0)
             obj.addProperty("bassBoostGain", eq.bassBoostMillibel / 100f)

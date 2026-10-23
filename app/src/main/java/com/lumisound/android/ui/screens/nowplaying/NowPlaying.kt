@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -119,6 +120,7 @@ data class StageActions(
     val onShuffle: () -> Unit = {},
     val onRepeat: () -> Unit = {},
     val onSpeed: (Float) -> Unit = {},
+    val onPitch: (Float) -> Unit = {},
     /** Minutes, [SLEEP_END_OF_TRACK], or null to cancel. */
     val onSleepTimer: (Int?) -> Unit = {},
     val onFavorite: (() -> Unit)? = null,
@@ -195,6 +197,7 @@ fun NowPlayingSheet(container: AppContainer, onDismiss: () -> Unit) {
                 onShuffle = { container.player.setShuffle(!state.shuffleEnabled) },
                 onRepeat = container.player::cycleRepeatMode,
                 onSpeed = { container.player.setSpeed(it) },
+                onPitch = { container.player.setPitchSemitones(it) },
                 onSleepTimer = { choice ->
                     when (choice) {
                         null -> container.player.cancelSleepTimer()
@@ -491,6 +494,7 @@ private fun DetailsFace(state: PlaybackUiState, nowMs: Long, actions: StageActio
 @Composable
 private fun ToolRow(state: PlaybackUiState, nowMs: Long, actions: StageActions) {
     var speedMenu by remember { mutableStateOf(false) }
+    var pitchMenu by remember { mutableStateOf(false) }
     var sleepMenu by remember { mutableStateOf(false) }
     val timerOn = state.sleepAtMs != null || state.sleepAtEndOfTrack
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -499,6 +503,20 @@ private fun ToolRow(state: PlaybackUiState, nowMs: Long, actions: StageActions) 
             DropdownMenu(expanded = speedMenu, onDismissRequest = { speedMenu = false }) {
                 listOf(0.75f, 1f, 1.25f, 1.5f, 2f).forEach { speed ->
                     DropdownMenuItem(text = { Text("${speed}×") }, onClick = { speedMenu = false; actions.onSpeed(speed) })
+                }
+            }
+        }
+        // Independent of speed -- iOS parity (AudioSettings.pitchSemitones).
+        // Fixed menu choices rather than a slider, same presentation as Speed above.
+        Box {
+            val pitchLabel = if (state.pitchSemitones == 0f) "Pitch" else "%+.1f st".format(state.pitchSemitones)
+            ToolPill(Icons.Filled.MusicNote, pitchLabel, active = state.pitchSemitones != 0f) { pitchMenu = true }
+            DropdownMenu(expanded = pitchMenu, onDismissRequest = { pitchMenu = false }) {
+                listOf(-12f, -7f, -5f, -3f, 0f, 3f, 5f, 7f, 12f).forEach { semitones ->
+                    DropdownMenuItem(
+                        text = { Text(if (semitones == 0f) "Normal" else "%+.0f semitones".format(semitones)) },
+                        onClick = { pitchMenu = false; actions.onPitch(semitones) },
+                    )
                 }
             }
         }

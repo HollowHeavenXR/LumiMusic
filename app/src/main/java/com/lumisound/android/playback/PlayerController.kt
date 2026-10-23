@@ -7,6 +7,7 @@ import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlin.math.pow
 
 /** What the UI needs to render a mini player and a Now Playing screen. */
 data class QueueItem(
@@ -47,6 +49,8 @@ data class PlaybackUiState(
     val shuffleEnabled: Boolean = false,
     val repeatMode: Int = 0,
     val speed: Float = 1f,
+    /** -12..12, independent of [speed] -- iOS parity (`AudioSettings.pitchSemitones`). */
+    val pitchSemitones: Float = 0f,
     val isLocalSource: Boolean = false,
     val playbackError: String? = null,
     /** The queue entry's id: a server path, `local:…`, `youtube:…` or `podcast:…`. */
@@ -222,9 +226,25 @@ class PlayerController(
         }
     }
 
-    /** 0.5x to 2.0x; pitch follows speed, as every other player on the platform does. */
+    /**
+     * 0.5x to 2.0x. Was `setPlaybackSpeed` (which ties pitch to speed, "every
+     * other player on the platform" varispeed behavior) until independent
+     * pitch control existed to preserve across a speed change -- now goes
+     * through `setPlaybackParameters` directly so the current pitch isn't
+     * silently reset to 1.0 by a speed change.
+     */
     fun setSpeed(speed: Float) {
-        controller?.setPlaybackSpeed(speed.coerceIn(0.5f, 2.0f))
+        val clamped = speed.coerceIn(0.5f, 2.0f)
+        val currentPitch = controller?.playbackParameters?.pitch ?: 1f
+        controller?.setPlaybackParameters(PlaybackParameters(clamped, currentPitch))
+    }
+
+    /** -12..12 semitones, independent of speed -- iOS parity (`AudioSettings.pitchSemitones`). */
+    fun setPitchSemitones(semitones: Float) {
+        val clamped = semitones.coerceIn(-12f, 12f)
+        val pitchMultiplier = 2f.pow(clamped / 12f)
+        val currentSpeed = controller?.playbackParameters?.speed ?: 1f
+        controller?.setPlaybackParameters(PlaybackParameters(currentSpeed, pitchMultiplier))
     }
 
     /**
@@ -333,6 +353,7 @@ class PlayerController(
             shuffleEnabled = player.shuffleModeEnabled,
             repeatMode = player.repeatMode,
             speed = player.playbackParameters.speed,
+            pitchSemitones = (kotlin.math.ln(player.playbackParameters.pitch.toDouble()) / kotlin.math.ln(2.0) * 12.0).toFloat(),
             isLocalSource = metadata?.extras?.getBoolean(EXTRA_IS_LOCAL) == true,
             playbackError = player.playerError?.let { "${it.errorCodeName}: ${it.message}" },
             mediaId = item?.mediaId,
