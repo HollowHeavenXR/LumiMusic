@@ -10,6 +10,7 @@ import android.content.Context
 import com.lumisound.android.audio.AudioSessionHolder
 import com.lumisound.android.audio.AudioSettingsSyncService
 import com.lumisound.android.audio.EqualizerController
+import com.lumisound.android.audio.MonoDownmixController
 import com.lumisound.android.bridge.AccountRepository
 import com.lumisound.android.bridge.BridgeConfig
 import com.lumisound.android.bridge.BridgeHttp
@@ -68,8 +69,9 @@ class AppContainer(private val context: Context) {
     val downloads by lazy { DownloadManager(context, http, config, database, remoteLogger, scope) }
     val artworkWarmer by lazy { ArtworkWarmer(context, database, config, scope) }
     val equalizer by lazy { EqualizerController(context) }
+    val monoDownmix by lazy { MonoDownmixController(context) }
     val player by lazy { PlayerController(context, config, scope) }
-    val audioSync by lazy { AudioSettingsSyncService(http, equalizer, player, scope) }
+    val audioSync by lazy { AudioSettingsSyncService(http, equalizer, player, monoDownmix, scope) }
     val lyrics by lazy { LyricsRepository(http) }
     val searchHistory by lazy { SearchHistoryStore(context) }
     val presence by lazy { PresenceService(http, tokenStore, player, scope) }

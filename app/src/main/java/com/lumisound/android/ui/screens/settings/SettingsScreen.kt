@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.DownloadForOffline
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Equalizer
+import androidx.compose.material.icons.filled.Hearing
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Replay
@@ -40,6 +41,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -93,6 +95,7 @@ data class SettingsUiState(
     val galleryLabel: String = "Photos from Lumisound on iPhone",
     /** "m4a"/"mp3"/"flac"/"opus"/"best" -- what a search result is transcoded to when saved to the library. */
     val preferredAudioFormat: String = "m4a",
+    val monoDownmixEnabled: Boolean = false,
 )
 
 data class SettingsCallbacks(
@@ -102,6 +105,7 @@ data class SettingsCallbacks(
     val onSignOut: () -> Unit = {},
     val onChangeUsername: suspend (String) -> UpdateResult = { UpdateResult.Failure("Not signed in") },
     val onSetAudioFormat: (String) -> Unit = {},
+    val onSetMonoDownmix: (Boolean) -> Unit = {},
     val onRescan: () -> Unit = {},
     val onSaveBridge: (String) -> String = { it },
     val onSaveSelfHostedKey: (String?) -> Unit = {},
@@ -129,6 +133,7 @@ fun SettingsScreen(
     val downloads by container.database.downloads().observePaths()
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val user = (account as? AccountState.SignedIn)?.user
+    val monoDownmixEnabled by container.monoDownmix.enabled.collectAsStateWithLifecycle()
     // Not a Flow -- this is a single remote field with no local cache of its
     // own, same reasoning as onSaveBridge's comment above about container.config.
     var preferredAudioFormat by remember { mutableStateOf("m4a") }
@@ -162,6 +167,7 @@ fun SettingsScreen(
                 else -> "Off · ${gallery.photos.size} photos from your iPhone"
             },
             preferredAudioFormat = preferredAudioFormat,
+            monoDownmixEnabled = monoDownmixEnabled,
         ),
         callbacks = SettingsCallbacks(
             onBack = onBack,
@@ -175,6 +181,7 @@ fun SettingsScreen(
                 }
             },
             onChangeUsername = { newUsername -> container.account.updateUsername(newUsername) },
+            onSetMonoDownmix = { on -> container.monoDownmix.setEnabled(on) },
             onSetAudioFormat = { format ->
                 preferredAudioFormat = format
                 scope.launch {
@@ -410,6 +417,13 @@ fun SettingsContent(state: SettingsUiState, callbacks: SettingsCallbacks) {
         Spacer(Modifier.height(22.dp))
         SettingsGroup("This phone") {
             SettingsRow(Icons.Filled.Refresh, "Rescan device library", state.scanLabel, onClick = callbacks.onRescan)
+            Hairline()
+            SettingsRow(
+                Icons.Filled.Hearing,
+                "Mono audio",
+                "Sum both channels to one -- useful with a single earbud or mono hearing",
+                trailing = { Switch(checked = state.monoDownmixEnabled, onCheckedChange = callbacks.onSetMonoDownmix) },
+            )
             Hairline()
             var formatMenuOpen by remember { mutableStateOf(false) }
             Box {

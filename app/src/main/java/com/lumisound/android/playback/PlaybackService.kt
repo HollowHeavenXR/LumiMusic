@@ -9,7 +9,10 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.datasource.DataSourceBitmapLoader
 import androidx.media3.session.CacheBitmapLoader
@@ -18,6 +21,7 @@ import androidx.media3.session.MediaSessionService
 import com.lumisound.android.LumiMusicApp
 import com.google.common.util.concurrent.MoreExecutors
 import com.lumisound.android.audio.AudioSessionHolder
+import com.lumisound.android.audio.MonoDownmixHolder
 import java.util.concurrent.Executors
 import kotlin.math.pow
 
@@ -45,7 +49,23 @@ class PlaybackService : MediaSessionService() {
             DefaultDataSource.Factory(this, httpFactory)
         )
 
+        // Only to splice MonoDownmixHolder.processor into the audio-processor chain --
+        // everything else about renderer construction stays the default behavior.
+        val renderersFactory = object : DefaultRenderersFactory(this) {
+            override fun buildAudioSink(
+                context: android.content.Context,
+                enableFloatOutput: Boolean,
+                enableAudioTrackPlaybackParams: Boolean,
+            ): AudioSink =
+                DefaultAudioSink.Builder(context)
+                    .setEnableFloatOutput(enableFloatOutput)
+                    .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                    .setAudioProcessors(arrayOf(MonoDownmixHolder.processor))
+                    .build()
+        }
+
         val player = ExoPlayer.Builder(this)
+            .setRenderersFactory(renderersFactory)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
             .setAudioAttributes(
                 AudioAttributes.Builder()

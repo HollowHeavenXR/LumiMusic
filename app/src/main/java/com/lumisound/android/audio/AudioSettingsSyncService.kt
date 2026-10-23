@@ -17,11 +17,11 @@ import kotlinx.coroutines.flow.onEach
 
 /**
  * Round-trips the handful of `AudioSettings` fields this app can actually act
- * on (speed, volume, equalizer on/off, bass boost) through the same
- * `audio_settings_json` blob Lumisound (iOS) writes -- a free-form JSON
- * object this class neither owns nor fully understands the shape of: speed
- * aside, fields like pitch, reverb, 8D audio, spatial audio, and crossfade
- * have no Android equivalent at all. Every write here reads the CURRENT blob
+ * on (speed, volume, equalizer on/off, bass boost, mono downmix) through the
+ * same `audio_settings_json` blob Lumisound (iOS) writes -- a free-form JSON
+ * object this class neither owns nor fully understands the shape of: pitch,
+ * reverb, 8D audio, spatial audio, and crossfade still have no Android
+ * equivalent. Every write here reads the CURRENT blob
  * first and only overwrites the handful of keys below (see [push]), so an
  * Android-side change never wipes an iOS-only field it has no way to
  * represent, and the reverse holds too: pulling a blob shaped by fields this
@@ -40,6 +40,7 @@ class AudioSettingsSyncService(
     private val http: BridgeHttp,
     private val equalizer: EqualizerController,
     private val player: PlayerController,
+    private val monoDownmix: MonoDownmixController,
     private val scope: CoroutineScope,
 ) {
     /** Suppresses [push] while [pullAndApply] is itself the one writing local state. */
@@ -61,6 +62,11 @@ class AudioSettingsSyncService(
         player.state
             .map { it.speed }
             .distinctUntilChanged()
+            .drop(1)
+            .debounce(800)
+            .onEach { if (!applyingRemote) push() }
+            .launchIn(scope)
+        monoDownmix.enabled
             .drop(1)
             .debounce(800)
             .onEach { if (!applyingRemote) push() }
@@ -96,6 +102,7 @@ class AudioSettingsSyncService(
                 val boostEnabled = obj.booleanOrNull("bassBoostEnabled") ?: false
                 val boostGainDb = obj.floatOrNull("bassBoostGain") ?: 0f
                 equalizer.setBassBoost(if (boostEnabled) (boostGainDb * 100).toInt() else 0)
+                obj.booleanOrNull("monoAudioEnabled")?.let { monoDownmix.setEnabled(it) }
             } finally {
                 applyingRemote = false
             }
@@ -114,6 +121,7 @@ class AudioSettingsSyncService(
             obj.addProperty("equalizerEnabled", eq.enabled)
             obj.addProperty("bassBoostEnabled", eq.bassBoostMillibel > 0)
             obj.addProperty("bassBoostGain", eq.bassBoostMillibel / 100f)
+            obj.addProperty("monoAudioEnabled", monoDownmix.enabled.value)
             http.libraryData.updateSettings(UpdateSettingsRequest(audioSettingsJson = obj.toString()))
         } catch (e: Exception) {
             AppLogger.w("audio", "settings push failed: ${e.javaClass.simpleName}")
