@@ -3,6 +3,7 @@ package com.lumisound.android.bridge
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.lumisound.android.BuildConfig
+import com.lumisound.android.bridge.api.ArtistApi
 import com.lumisound.android.bridge.api.AuthApi
 import com.lumisound.android.bridge.api.CloudMusicApi
 import com.lumisound.android.bridge.api.DiagnosticsApi
@@ -97,6 +98,7 @@ class BridgeHttp(
     val social: SocialApi get() = current().create(SocialApi::class.java)
     val podcasts: PodcastApi get() = current().create(PodcastApi::class.java)
     val gallery: GalleryApi get() = current().create(GalleryApi::class.java)
+    val artist: ArtistApi get() = current().create(ArtistApi::class.java)
 }
 
 /**

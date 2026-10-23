@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import com.lumisound.android.ui.components.ArtistAvatar
 import com.lumisound.android.ui.components.Artwork
 import com.lumisound.android.ui.components.ChipRow
 import com.lumisound.android.ui.components.GlassButton
@@ -241,6 +242,24 @@ fun DeviceLibraryScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
                             if (cover != null) {
                                 TextButton(onClick = { container.folderCoverArt.removeCover(group) }) { Text("Remove") }
                             }
+                        }
+                    }
+                }
+                return@Column
+            }
+            if (grouping == Grouping.Artists) {
+                LazyColumn(Modifier.fillMaxSize()) {
+                    items(groups, key = { it }) { group ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { openGroup = group }
+                                .padding(horizontal = 20.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            ArtistAvatar(group.ifBlank { "Unknown" }, 40.dp, container.http.artist)
+                            Spacer(Modifier.padding(start = 14.dp))
+                            OneLine(group.ifBlank { "Unknown" }, style = MaterialTheme.typography.bodyLarge)
                         }
                     }
                 }
