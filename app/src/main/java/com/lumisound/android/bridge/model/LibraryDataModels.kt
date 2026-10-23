@@ -97,10 +97,13 @@ data class UserSettingsDto(
     @SerializedName("track_audio_settings_json") val trackAudioSettingsJson: String? = null,
     @SerializedName("theme_color") val themeColor: String? = null,
     @SerializedName("updated_at") val updatedAt: String? = null,
+    /** "m4a"/"mp3"/"flac"/"opus"/"best" -- what format a new download (search -> save) is transcoded to. */
+    @SerializedName("preferred_audio_format") val preferredAudioFormat: String? = null,
 )
 
 data class UpdateSettingsRequest(
     @SerializedName("audio_settings_json") val audioSettingsJson: String? = null,
     @SerializedName("track_audio_settings_json") val trackAudioSettingsJson: String? = null,
     @SerializedName("theme_color") val themeColor: String? = null,
+    @SerializedName("preferred_audio_format") val preferredAudioFormat: String? = null,
 )

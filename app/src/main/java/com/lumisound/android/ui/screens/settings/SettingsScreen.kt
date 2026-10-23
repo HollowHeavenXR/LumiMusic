@@ -34,6 +34,8 @@ import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +43,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -60,6 +63,7 @@ import com.lumisound.android.BuildConfig
 import com.lumisound.android.bridge.AccountState
 import com.lumisound.android.bridge.BridgeUrls
 import com.lumisound.android.bridge.UpdateResult
+import com.lumisound.android.bridge.model.UpdateSettingsRequest
 import com.lumisound.android.ui.Route
 import com.lumisound.android.ui.aura.LocalAura
 import com.lumisound.android.ui.components.GlassButton
@@ -87,6 +91,8 @@ data class SettingsUiState(
     val scanLabel: String,
     val version: String,
     val galleryLabel: String = "Photos from Lumisound on iPhone",
+    /** "m4a"/"mp3"/"flac"/"opus"/"best" -- what a search result is transcoded to when saved to the library. */
+    val preferredAudioFormat: String = "m4a",
 )
 
 data class SettingsCallbacks(
@@ -95,6 +101,7 @@ data class SettingsCallbacks(
     val onImport: () -> Unit = {},
     val onSignOut: () -> Unit = {},
     val onChangeUsername: suspend (String) -> UpdateResult = { UpdateResult.Failure("Not signed in") },
+    val onSetAudioFormat: (String) -> Unit = {},
     val onRescan: () -> Unit = {},
     val onSaveBridge: (String) -> String = { it },
     val onSaveSelfHostedKey: (String?) -> Unit = {},
@@ -122,6 +129,16 @@ fun SettingsScreen(
     val downloads by container.database.downloads().observePaths()
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val user = (account as? AccountState.SignedIn)?.user
+    // Not a Flow -- this is a single remote field with no local cache of its
+    // own, same reasoning as onSaveBridge's comment above about container.config.
+    var preferredAudioFormat by remember { mutableStateOf("m4a") }
+    LaunchedEffect(Unit) {
+        preferredAudioFormat = try {
+            container.http.libraryData.settings().preferredAudioFormat ?: "m4a"
+        } catch (e: Exception) {
+            "m4a"
+        }
+    }
 
     SettingsContent(
         state = SettingsUiState(
@@ -144,6 +161,7 @@ fun SettingsScreen(
                 gallery.settings.enabled -> "On · ${gallery.photos.size} photos from your iPhone"
                 else -> "Off · ${gallery.photos.size} photos from your iPhone"
             },
+            preferredAudioFormat = preferredAudioFormat,
         ),
         callbacks = SettingsCallbacks(
             onBack = onBack,
@@ -157,6 +175,17 @@ fun SettingsScreen(
                 }
             },
             onChangeUsername = { newUsername -> container.account.updateUsername(newUsername) },
+            onSetAudioFormat = { format ->
+                preferredAudioFormat = format
+                scope.launch {
+                    try {
+                        container.http.libraryData.updateSettings(UpdateSettingsRequest(preferredAudioFormat = format))
+                    } catch (e: Exception) {
+                        // Stays selected locally either way; worst case a future
+                        // save from this screen retries the same value.
+                    }
+                }
+            },
             onRescan = { scope.launch { container.libraryScanner.scan() } },
             onSaveBridge = { url ->
                 container.config.baseUrl = url
@@ -381,6 +410,24 @@ fun SettingsContent(state: SettingsUiState, callbacks: SettingsCallbacks) {
         Spacer(Modifier.height(22.dp))
         SettingsGroup("This phone") {
             SettingsRow(Icons.Filled.Refresh, "Rescan device library", state.scanLabel, onClick = callbacks.onRescan)
+            Hairline()
+            var formatMenuOpen by remember { mutableStateOf(false) }
+            Box {
+                SettingsRow(
+                    Icons.Filled.Dns,
+                    "Download format",
+                    "What a saved search result is transcoded to (${state.preferredAudioFormat.uppercase()})",
+                    onClick = { formatMenuOpen = true },
+                )
+                DropdownMenu(expanded = formatMenuOpen, onDismissRequest = { formatMenuOpen = false }) {
+                    listOf("m4a", "mp3", "flac", "opus", "best").forEach { format ->
+                        DropdownMenuItem(
+                            text = { Text(format.uppercase()) },
+                            onClick = { formatMenuOpen = false; callbacks.onSetAudioFormat(format) },
+                        )
+                    }
+                }
+            }
         }
 
         Spacer(Modifier.height(22.dp))

@@ -20,9 +20,11 @@ import com.lumisound.android.playback.toPlayable
 import com.lumisound.android.ui.components.Loadable
 import com.lumisound.android.ui.components.StreamTrackActions
 import com.lumisound.android.ui.components.friendlyError
+import com.lumisound.android.ui.SaveStreamResult
 import com.lumisound.android.ui.enqueueStream
 import com.lumisound.android.ui.playStreamNext
 import com.lumisound.android.ui.playStreams
+import com.lumisound.android.ui.saveStreamToLibrary
 import com.lumisound.android.ui.startRadio
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -122,6 +124,17 @@ fun SearchScreen(container: AppContainer) {
                         if (!container.startRadio(seed)) {
                             Toast.makeText(context, "Couldn't build a radio for that track.", Toast.LENGTH_SHORT).show()
                         }
+                    }
+                },
+                onSave = { track ->
+                    scope.launch {
+                        Toast.makeText(context, "Saving \"${track.title}\"…", Toast.LENGTH_SHORT).show()
+                        val message = when (val result = container.saveStreamToLibrary(track)) {
+                            is SaveStreamResult.Saved -> "Saved to your library."
+                            is SaveStreamResult.AlreadyOwned -> "Already in your library."
+                            is SaveStreamResult.Failed -> result.message
+                        }
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                     }
                 },
             ),

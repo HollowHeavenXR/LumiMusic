@@ -75,6 +75,14 @@ object BridgeUrls {
     fun cloudArtwork(baseUrl: String, serverPath: String): String? =
         serverPath.takeIf { it.isNotBlank() }?.let { artwork(baseUrl, it) }
 
+    /** `GET /api/download/result?job_id=...` -- the finished bytes for a job started via `StreamingApi.startDownload`. */
+    fun downloadResult(baseUrl: String, jobId: String): String =
+        Uri.parse(BridgeConfig.normalise(baseUrl)).buildUpon()
+            .appendEncodedPath("api/download/result")
+            .appendQueryParameter("job_id", jobId)
+            .build()
+            .toString()
+
     fun avatar(baseUrl: String, userId: String): String =
         Uri.parse(BridgeConfig.normalise(baseUrl)).buildUpon()
             .appendEncodedPath("user/avatar")

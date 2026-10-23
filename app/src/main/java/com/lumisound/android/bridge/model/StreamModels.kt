@@ -27,3 +27,22 @@ data class SearchQueryDto(
     val query: String = "",
     val count: Int = 0,
 )
+
+/** `GET /api/download`'s 202 body -- poll [DownloadStatusResponse] with this. */
+data class DownloadStartResponse(
+    @SerializedName("job_id") val jobId: String = "",
+)
+
+/**
+ * `GET /api/download/status`. `status` is "pending", "done", or "error" --
+ * [code]/[detail]/[permanent] are only populated for "error" (see the
+ * bridge's `download_status`: [permanent] is true only when the video
+ * itself is gone/private, as opposed to a transient bot-wall/network issue
+ * worth retrying).
+ */
+data class DownloadStatusResponse(
+    val status: String = "pending",
+    val code: Int? = null,
+    val detail: String? = null,
+    val permanent: Boolean? = null,
+)

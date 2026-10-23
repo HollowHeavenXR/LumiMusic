@@ -1,7 +1,10 @@
 package com.lumisound.android.bridge.api
 
+import com.lumisound.android.bridge.model.DownloadStartResponse
+import com.lumisound.android.bridge.model.DownloadStatusResponse
 import com.lumisound.android.bridge.model.SearchQueryDto
 import com.lumisound.android.bridge.model.StreamTrackDto
+import retrofit2.Response
 import retrofit2.http.GET
 import retrofit2.http.Query
 
@@ -42,4 +45,27 @@ interface StreamingApi {
         @Query("q") prefix: String,
         @Query("limit") limit: Int = 8,
     ): List<SearchQueryDto>
+
+    /**
+     * Starts a background download+transcode job and returns its job_id (202) --
+     * poll [downloadStatus] until it's no longer "pending", then fetch the bytes
+     * via `BridgeUrls.downloadResult`. A plain 204 (no body) means the bridge
+     * already has this track in the account's library and skipped the work --
+     * [Response] rather than the bare DTO so that case doesn't throw.
+     */
+    @GET("api/download")
+    suspend fun startDownload(
+        @Query("id") id: String,
+        @Query("source") source: String,
+        @Query("url") url: String?,
+        @Query("format") format: String,
+        @Query("title") title: String?,
+        @Query("full_title") fullTitle: String?,
+        @Query("artist") artist: String?,
+        @Query("thumbnail") thumbnail: String?,
+        @Query("duration") duration: Int?,
+    ): Response<DownloadStartResponse>
+
+    @GET("api/download/status")
+    suspend fun downloadStatus(@Query("job_id") jobId: String): DownloadStatusResponse
 }

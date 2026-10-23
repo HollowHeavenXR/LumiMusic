@@ -52,3 +52,13 @@ data class CloudSearchResponse(
     val tracks: List<CloudTrackDto> = emptyList(),
     val total: Int = 0,
 )
+
+/** `POST /user/music/upload`'s 201 body. [duplicate] means a byte-identical file was already there -- not an error. */
+data class MusicUploadResponse(
+    val filename: String = "",
+    val path: String = "",
+    val id: String = "",
+    @SerializedName("metadata_id") val metadataId: String = "",
+    val size: Long = 0,
+    val duplicate: Boolean = false,
+)

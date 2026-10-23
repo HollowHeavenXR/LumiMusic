@@ -17,6 +17,8 @@ data class StreamTrackActions(
     val onPlayNext: (StreamTrackDto) -> Unit = {},
     val onEnqueue: (StreamTrackDto) -> Unit = {},
     val onRadio: ((StreamTrackDto) -> Unit)? = null,
+    /** Downloads+transcodes this result into the account's cloud library, same as iOS can. */
+    val onSave: ((StreamTrackDto) -> Unit)? = null,
 )
 
 /** The "YouTube · 3:41" style secondary line, via the shared title-dedupe rules. */
@@ -68,6 +70,12 @@ fun StreamTrackRow(
                 DropdownMenuItem(
                     text = { Text("Start radio") },
                     onClick = { menuOpen = false; actions.onRadio.invoke(track) },
+                )
+            }
+            if (actions.onSave != null) {
+                DropdownMenuItem(
+                    text = { Text("Save to library") },
+                    onClick = { menuOpen = false; actions.onSave.invoke(track) },
                 )
             }
         }
