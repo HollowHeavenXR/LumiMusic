@@ -15,6 +15,7 @@ import com.lumisound.android.bridge.AccountRepository
 import com.lumisound.android.bridge.BridgeConfig
 import com.lumisound.android.bridge.BridgeHttp
 import com.lumisound.android.bridge.LoudnessGainStore
+import com.lumisound.android.bridge.ReplayGainController
 import com.lumisound.android.bridge.TokenStore
 import com.lumisound.android.cloud.CloudImportService
 import com.lumisound.android.data.AppearanceStore
@@ -55,6 +56,7 @@ class AppContainer(private val context: Context) {
     val config by lazy { BridgeConfig(context) }
     val tokenStore by lazy { TokenStore(context) }
     val loudnessGains by lazy { LoudnessGainStore() }
+    val replayGain by lazy { ReplayGainController(context) }
     val httpMetrics by lazy { HttpMetrics() }
     val http by lazy { BridgeHttp(config, tokenStore, loudnessGains, httpMetrics) }
     val database by lazy { LumiDatabase.build(context) }
@@ -75,7 +77,7 @@ class AppContainer(private val context: Context) {
     val equalizer by lazy { EqualizerController(context) }
     val monoDownmix by lazy { MonoDownmixController(context) }
     val player by lazy { PlayerController(context, config, scope) }
-    val audioSync by lazy { AudioSettingsSyncService(http, equalizer, player, monoDownmix, scope) }
+    val audioSync by lazy { AudioSettingsSyncService(http, equalizer, player, monoDownmix, replayGain, scope) }
     val lyrics by lazy { LyricsRepository(http) }
     val searchHistory by lazy { SearchHistoryStore(context) }
     val presence by lazy { PresenceService(http, tokenStore, player, scope) }

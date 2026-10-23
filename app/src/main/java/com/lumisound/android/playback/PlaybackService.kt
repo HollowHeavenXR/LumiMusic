@@ -24,6 +24,10 @@ import com.lumisound.android.audio.AudioSessionHolder
 import com.lumisound.android.audio.MonoDownmixHolder
 import java.util.concurrent.Executors
 import kotlin.math.pow
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.launch
 
 /**
  * The single place audio actually plays. A `MediaSessionService` so playback
@@ -86,7 +90,14 @@ class PlaybackService : MediaSessionService() {
             AudioSessionHolder.publish(sessionId)
         }
 
-        player.addListener(LoudnessListener(player, container.loudnessGains))
+        val loudnessListener = LoudnessListener(player, container.loudnessGains, container.replayGain)
+        player.addListener(loudnessListener)
+        // The listener only re-evaluates on a track/play-state change -- toggling
+        // this setting mid-track needs its own trigger so the volume it already
+        // set actually changes immediately rather than waiting for the next track.
+        container.scope.launch(Dispatchers.Main) {
+            container.replayGain.enabled.drop(1).collect { loudnessListener.apply(player.currentMediaItem) }
+        }
 
         // The media notification loads artwork through its own BitmapLoader, which by
         // default uses an unauthenticated data source -- the same mistake that hid artwork in
@@ -137,6 +148,7 @@ class PlaybackService : MediaSessionService() {
 private class LoudnessListener(
     private val player: Player,
     private val gains: com.lumisound.android.bridge.LoudnessGainStore,
+    private val replayGain: com.lumisound.android.bridge.ReplayGainController,
 ) : Player.Listener {
 
     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) = apply(mediaItem)
@@ -145,12 +157,14 @@ private class LoudnessListener(
         if (isPlaying) apply(player.currentMediaItem)
     }
 
-    private fun apply(mediaItem: MediaItem?) {
+    fun apply(mediaItem: MediaItem?) {
         val serverPath = mediaItem?.localConfiguration?.uri?.getQueryParameter("path")
         val gainDb = gains.gainDb(serverPath)
-        // 1.0 (no change) for an unanalyzed track: silently attenuating audio the
-        // server has no measurement for would be worse than leaving it alone.
-        player.volume = if (gainDb == null) 1f else {
+        // 1.0 (no change) for an unanalyzed track, or when the user has turned
+        // this off entirely: silently attenuating audio the server has no
+        // measurement for would be worse than leaving it alone, same reasoning
+        // either way.
+        player.volume = if (gainDb == null || !replayGain.enabled.value) 1f else {
             10.0.pow(gainDb.toDouble() / 20.0).toFloat().coerceIn(0.05f, 1f)
         }
     }

@@ -53,6 +53,7 @@ import com.lumisound.android.ui.theme.LocalLumiPalette
 @Composable
 fun EqualizerScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
     val state by container.equalizer.state.collectAsStateWithLifecycle()
+    val replayGainEnabled by container.replayGain.enabled.collectAsStateWithLifecycle()
     EqualizerContent(
         state = state,
         onBack = onBack,
@@ -63,6 +64,8 @@ fun EqualizerScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
         onBoost = container.equalizer::setBassBoost,
         onReverbEnabled = container.equalizer::setReverbEnabled,
         onReverbPreset = container.equalizer::setReverbPreset,
+        replayGainEnabled = replayGainEnabled,
+        onReplayGainEnabled = container.replayGain::setEnabled,
     )
 }
 
@@ -83,6 +86,8 @@ fun EqualizerContent(
     onBoost: (Int) -> Unit,
     onReverbEnabled: (Boolean) -> Unit,
     onReverbPreset: (String) -> Unit,
+    replayGainEnabled: Boolean,
+    onReplayGainEnabled: (Boolean) -> Unit,
 ) {
     val palette = LocalLumiPalette.current
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
@@ -125,6 +130,23 @@ fun EqualizerContent(
 
         GlassPanel {
             MixingDesk(state, onBand, dimmed = !state.enabled)
+        }
+
+        IconSectionHeader(Icons.Filled.GraphicEq, "Volume leveling")
+        GlassPanel {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Automatically turns down tracks the cloud library measured as too loud, so the whole library plays at a more even level.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(
+                    checked = replayGainEnabled,
+                    onCheckedChange = onReplayGainEnabled,
+                    colors = SwitchDefaults.colors(checkedTrackColor = palette.accent),
+                )
+            }
         }
 
         IconSectionHeader(Icons.Filled.GraphicEq, "Extra gain")

@@ -3,6 +3,7 @@ package com.lumisound.android.audio
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.lumisound.android.bridge.BridgeHttp
+import com.lumisound.android.bridge.ReplayGainController
 import com.lumisound.android.bridge.model.UpdateSettingsRequest
 import com.lumisound.android.diagnostics.AppLogger
 import com.lumisound.android.playback.PlayerController
@@ -41,6 +42,7 @@ class AudioSettingsSyncService(
     private val equalizer: EqualizerController,
     private val player: PlayerController,
     private val monoDownmix: MonoDownmixController,
+    private val replayGain: ReplayGainController,
     private val scope: CoroutineScope,
 ) {
     /** Suppresses [push] while [pullAndApply] is itself the one writing local state. */
@@ -67,6 +69,11 @@ class AudioSettingsSyncService(
             .onEach { if (!applyingRemote) push() }
             .launchIn(scope)
         monoDownmix.enabled
+            .drop(1)
+            .debounce(800)
+            .onEach { if (!applyingRemote) push() }
+            .launchIn(scope)
+        replayGain.enabled
             .drop(1)
             .debounce(800)
             .onEach { if (!applyingRemote) push() }
@@ -103,6 +110,7 @@ class AudioSettingsSyncService(
                 val boostGainDb = obj.floatOrNull("bassBoostGain") ?: 0f
                 equalizer.setBassBoost(if (boostEnabled) (boostGainDb * 100).toInt() else 0)
                 obj.booleanOrNull("monoAudioEnabled")?.let { monoDownmix.setEnabled(it) }
+                obj.booleanOrNull("replayGainEnabled")?.let { replayGain.setEnabled(it) }
                 // reverbWetDryMix has no Android equivalent at all (PresetReverb
                 // exposes no mix control, only on/off + a fixed room preset) --
                 // pulled nowhere, pushed nowhere, same asymmetric treatment as
@@ -128,6 +136,7 @@ class AudioSettingsSyncService(
             obj.addProperty("bassBoostEnabled", eq.bassBoostMillibel > 0)
             obj.addProperty("bassBoostGain", eq.bassBoostMillibel / 100f)
             obj.addProperty("monoAudioEnabled", monoDownmix.enabled.value)
+            obj.addProperty("replayGainEnabled", replayGain.enabled.value)
             obj.addProperty("reverbEnabled", eq.reverbEnabled)
             obj.addProperty("reverbPreset", eq.reverbPresetName)
             http.libraryData.updateSettings(UpdateSettingsRequest(audioSettingsJson = obj.toString()))
