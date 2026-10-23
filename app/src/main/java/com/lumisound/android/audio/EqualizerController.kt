@@ -3,6 +3,7 @@ package com.lumisound.android.audio
 import android.content.Context
 import android.media.audiofx.Equalizer
 import android.media.audiofx.LoudnessEnhancer
+import android.media.audiofx.PresetReverb
 import com.lumisound.android.diagnostics.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +24,9 @@ data class EqState(
     val presets: List<String> = emptyList(),
     val currentPreset: Int = -1,
     val bassBoostMillibel: Int = 0,
+    val reverbEnabled: Boolean = false,
+    /** iOS's `ReverbRoomPreset` raw value -- see REVERB_PRESETS for the mapping. */
+    val reverbPresetName: String = "mediumRoom",
     val error: String? = null,
 )
 
@@ -42,6 +46,7 @@ class EqualizerController(private val context: Context) {
 
     private var equalizer: Equalizer? = null
     private var enhancer: LoudnessEnhancer? = null
+    private var reverb: PresetReverb? = null
     private var sessionId: Int = 0
 
     private val _state = MutableStateFlow(EqState())
@@ -66,6 +71,15 @@ class EqualizerController(private val context: Context) {
             } catch (e: Exception) {
                 // Not on every device; the equalizer is still usable without it.
                 AppLogger.w("audio", "LoudnessEnhancer unavailable: ${e.javaClass.simpleName}")
+                null
+            }
+            reverb = try {
+                PresetReverb(0, audioSessionId).also { rv ->
+                    rv.preset = REVERB_PRESETS[prefs.getString(KEY_REVERB_PRESET, null)] ?: PresetReverb.PRESET_MEDIUMROOM
+                    rv.enabled = prefs.getBoolean(KEY_REVERB_ENABLED, false)
+                }
+            } catch (e: Exception) {
+                AppLogger.w("audio", "PresetReverb unavailable: ${e.javaClass.simpleName}")
                 null
             }
             val enabled = prefs.getBoolean(KEY_ENABLED, false)
@@ -136,6 +150,26 @@ class EqualizerController(private val context: Context) {
         publish()
     }
 
+    fun setReverbEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_REVERB_ENABLED, enabled).apply()
+        runCatching { reverb?.enabled = enabled }
+        publish()
+    }
+
+    /**
+     * [presetName] is one of iOS's `ReverbRoomPreset` raw values -- see
+     * [REVERB_PRESETS]. Android's `PresetReverb` has no equivalent to
+     * `"cathedral"` (iOS's only preset without a 1:1 match); an unrecognized
+     * name falls back to medium room rather than being rejected, same as
+     * [restoreSavedCurve] falling back for an out-of-range stored preset.
+     */
+    fun setReverbPreset(presetName: String) {
+        val preset = REVERB_PRESETS[presetName] ?: PresetReverb.PRESET_MEDIUMROOM
+        prefs.edit().putString(KEY_REVERB_PRESET, presetName).apply()
+        runCatching { reverb?.preset = preset }
+        publish()
+    }
+
     /**
      * Approximates a curve defined at [sourceFrequenciesHz] (dB values in
      * [sourceLevelsDb], same length/order) onto this device's own hardware
@@ -170,8 +204,10 @@ class EqualizerController(private val context: Context) {
     fun release() {
         runCatching { equalizer?.release() }
         runCatching { enhancer?.release() }
+        runCatching { reverb?.release() }
         equalizer = null
         enhancer = null
+        reverb = null
     }
 
     private fun restoreSavedCurve(eq: Equalizer) {
@@ -210,6 +246,8 @@ class EqualizerController(private val context: Context) {
                 presets = (0 until eq.numberOfPresets).map { eq.getPresetName(it.toShort()) },
                 currentPreset = prefs.getInt(KEY_PRESET, -1),
                 bassBoostMillibel = prefs.getInt(KEY_BOOST, 0),
+                reverbEnabled = prefs.getBoolean(KEY_REVERB_ENABLED, false),
+                reverbPresetName = prefs.getString(KEY_REVERB_PRESET, null) ?: "mediumRoom",
             )
         } catch (e: Exception) {
             EqState(available = false, error = e.javaClass.simpleName)
@@ -221,5 +259,23 @@ class EqualizerController(private val context: Context) {
         const val KEY_PRESET = "eq_preset"
         const val KEY_BAND = "eq_band_"
         const val KEY_BOOST = "eq_boost"
+        const val KEY_REVERB_ENABLED = "reverb_enabled"
+        const val KEY_REVERB_PRESET = "reverb_preset"
+
+        /**
+         * iOS's `ReverbRoomPreset` raw values that have a real Android
+         * `PresetReverb` equivalent -- 6 of iOS's 7 (iOS's "cathedral" has
+         * no Android counterpart at all; callers fall back to medium room
+         * for it). Exposed as the names an Android-side preset picker
+         * should offer, same names iOS already uses in its own UI.
+         */
+        val REVERB_PRESETS: Map<String, Short> = mapOf(
+            "smallRoom" to PresetReverb.PRESET_SMALLROOM,
+            "mediumRoom" to PresetReverb.PRESET_MEDIUMROOM,
+            "largeRoom" to PresetReverb.PRESET_LARGEROOM,
+            "mediumHall" to PresetReverb.PRESET_MEDIUMHALL,
+            "largeHall" to PresetReverb.PRESET_LARGEHALL,
+            "plate" to PresetReverb.PRESET_PLATE,
+        )
     }
 }

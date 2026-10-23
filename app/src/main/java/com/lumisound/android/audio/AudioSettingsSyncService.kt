@@ -103,6 +103,12 @@ class AudioSettingsSyncService(
                 val boostGainDb = obj.floatOrNull("bassBoostGain") ?: 0f
                 equalizer.setBassBoost(if (boostEnabled) (boostGainDb * 100).toInt() else 0)
                 obj.booleanOrNull("monoAudioEnabled")?.let { monoDownmix.setEnabled(it) }
+                // reverbWetDryMix has no Android equivalent at all (PresetReverb
+                // exposes no mix control, only on/off + a fixed room preset) --
+                // pulled nowhere, pushed nowhere, same asymmetric treatment as
+                // eqBands for the fields this platform genuinely cannot represent.
+                obj.get("reverbPreset")?.takeIf { !it.isJsonNull }?.asString?.let { equalizer.setReverbPreset(it) }
+                obj.booleanOrNull("reverbEnabled")?.let { equalizer.setReverbEnabled(it) }
             } finally {
                 applyingRemote = false
             }
@@ -122,6 +128,8 @@ class AudioSettingsSyncService(
             obj.addProperty("bassBoostEnabled", eq.bassBoostMillibel > 0)
             obj.addProperty("bassBoostGain", eq.bassBoostMillibel / 100f)
             obj.addProperty("monoAudioEnabled", monoDownmix.enabled.value)
+            obj.addProperty("reverbEnabled", eq.reverbEnabled)
+            obj.addProperty("reverbPreset", eq.reverbPresetName)
             http.libraryData.updateSettings(UpdateSettingsRequest(audioSettingsJson = obj.toString()))
         } catch (e: Exception) {
             AppLogger.w("audio", "settings push failed: ${e.javaClass.simpleName}")

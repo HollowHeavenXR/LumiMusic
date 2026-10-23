@@ -17,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -60,6 +61,8 @@ fun EqualizerScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
         onPreset = container.equalizer::applyPreset,
         onReset = container.equalizer::resetFlat,
         onBoost = container.equalizer::setBassBoost,
+        onReverbEnabled = container.equalizer::setReverbEnabled,
+        onReverbPreset = container.equalizer::setReverbPreset,
     )
 }
 
@@ -78,6 +81,8 @@ fun EqualizerContent(
     onPreset: (Int) -> Unit,
     onReset: () -> Unit,
     onBoost: (Int) -> Unit,
+    onReverbEnabled: (Boolean) -> Unit,
+    onReverbPreset: (String) -> Unit,
 ) {
     val palette = LocalLumiPalette.current
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
@@ -140,8 +145,39 @@ fun EqualizerContent(
                 Text("+%.1f dB".format(state.bassBoostMillibel / 100f), style = MaterialTheme.typography.labelLarge)
             }
         }
+
+        IconSectionHeader(Icons.Filled.Spa, "Reverb")
+        GlassPanel {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "A device's own room preset -- no continuous mix control here, unlike iPhone's.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(
+                    checked = state.reverbEnabled,
+                    onCheckedChange = onReverbEnabled,
+                    colors = SwitchDefaults.colors(checkedTrackColor = palette.accent),
+                )
+            }
+            ChipRow(
+                REVERB_PRESET_LABELS.map { (name, label) ->
+                    NavChip(label, Icons.Filled.Spa, selected = state.reverbPresetName == name, onClick = { onReverbPreset(name) })
+                }
+            )
+        }
     }
 }
+
+private val REVERB_PRESET_LABELS = listOf(
+    "smallRoom" to "Small Room",
+    "mediumRoom" to "Medium Room",
+    "largeRoom" to "Large Room",
+    "mediumHall" to "Medium Hall",
+    "largeHall" to "Large Hall",
+    "plate" to "Plate",
+)
 
 /**
  * Vertical faders drawn on one canvas, so the curve through their caps can be drawn on the
