@@ -31,12 +31,15 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Wallpaper
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,6 +59,7 @@ import com.lumisound.android.AppContainer
 import com.lumisound.android.BuildConfig
 import com.lumisound.android.bridge.AccountState
 import com.lumisound.android.bridge.BridgeUrls
+import com.lumisound.android.bridge.UpdateResult
 import com.lumisound.android.ui.Route
 import com.lumisound.android.ui.aura.LocalAura
 import com.lumisound.android.ui.components.GlassButton
@@ -90,6 +94,7 @@ data class SettingsCallbacks(
     val onOpen: (Route) -> Unit = {},
     val onImport: () -> Unit = {},
     val onSignOut: () -> Unit = {},
+    val onChangeUsername: suspend (String) -> UpdateResult = { UpdateResult.Failure("Not signed in") },
     val onRescan: () -> Unit = {},
     val onSaveBridge: (String) -> String = { it },
     val onSaveSelfHostedKey: (String?) -> Unit = {},
@@ -151,6 +156,7 @@ fun SettingsScreen(
                     container.gallery.clear()
                 }
             },
+            onChangeUsername = { newUsername -> container.account.updateUsername(newUsername) },
             onRescan = { scope.launch { container.libraryScanner.scan() } },
             onSaveBridge = { url ->
                 container.config.baseUrl = url
@@ -166,6 +172,65 @@ fun SettingsScreen(
 }
 
 private data class Control(val label: String, val detail: String?, val icon: ImageVector, val tint: Color, val route: Route)
+
+/**
+ * Rate-limited to twice per rolling 30 days server-side -- the error text
+ * on a rejected save IS that rate-limit message (or "already taken"),
+ * verbatim from the bridge, not a generic failure string.
+ */
+@Composable
+private fun UsernameDialog(
+    initialValue: String,
+    onDismiss: () -> Unit,
+    onSave: (newUsername: String, onResult: (UpdateResult) -> Unit) -> Unit,
+) {
+    var value by remember { mutableStateOf(initialValue) }
+    var saving by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val changed = value.trim() != initialValue && value.trim().length >= 3
+
+    AlertDialog(
+        onDismissRequest = { if (!saving) onDismiss() },
+        title = { Text("Change username") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { value = it; error = null },
+                    label = { Text("Username") },
+                    singleLine = true,
+                    enabled = !saving,
+                )
+                error?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
+            }
+        },
+        confirmButton = {
+            if (saving) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp))
+            } else {
+                TextButton(
+                    enabled = changed,
+                    onClick = {
+                        saving = true
+                        onSave(value.trim()) { result ->
+                            saving = false
+                            when (result) {
+                                is UpdateResult.Success -> onDismiss()
+                                is UpdateResult.Failure -> error = result.message
+                            }
+                        }
+                    },
+                ) { Text("Save") }
+            }
+        },
+        dismissButton = {
+            TextButton(enabled = !saving, onClick = onDismiss) { Text("Cancel") }
+        },
+    )
+}
 
 /**
  * Settings as a control room. The account leads, as a card in your own colours; the six
@@ -196,6 +261,8 @@ fun SettingsContent(state: SettingsUiState, callbacks: SettingsCallbacks) {
     var connectionUnlocked by remember { mutableStateOf(false) }
     val showConnection = connectionUnlocked || !state.officialBridge || BuildConfig.DEBUG
     var selfHostedKey by remember { mutableStateOf("") }
+    var editingUsername by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 28.dp)) {
         ScreenTitle("Settings", eyebrow = "You", onBack = callbacks.onBack)
@@ -216,7 +283,12 @@ fun SettingsContent(state: SettingsUiState, callbacks: SettingsCallbacks) {
                     Spacer(Modifier.size(14.dp))
                     Column(Modifier.weight(1f)) {
                         OneLine(state.displayName, style = MaterialTheme.typography.titleLarge)
-                        OneLine(state.username?.let { "@$it" } ?: "—", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.75f))
+                        OneLine(
+                            state.username?.let { "@$it" } ?: "—",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.75f),
+                            modifier = Modifier.clickable(enabled = state.username != null) { editingUsername = true },
+                        )
                         Spacer(Modifier.height(6.dp))
                         Pill(if (state.officialBridge) "Official bridge" else "Self-hosted bridge", tint = Color.White)
                     }
@@ -233,6 +305,18 @@ fun SettingsContent(state: SettingsUiState, callbacks: SettingsCallbacks) {
                     GlassButton("Sign out", Icons.AutoMirrored.Filled.Logout, onClick = callbacks.onSignOut, modifier = Modifier.weight(1f))
                 }
             }
+        }
+
+        if (editingUsername) {
+            UsernameDialog(
+                initialValue = state.username.orEmpty(),
+                onDismiss = { editingUsername = false },
+                onSave = { newUsername, onResult ->
+                    coroutineScope.launch {
+                        onResult(callbacks.onChangeUsername(newUsername))
+                    }
+                },
+            )
         }
 
         Text(

@@ -54,4 +54,6 @@ data class TwoFactorLoginRequest(
 
 data class UpdateMeRequest(
     @SerializedName("display_name") val displayName: String? = null,
+    /** Rate-limited server-side to twice per rolling 30 days -- see `bridgeDetail()`. */
+    val username: String? = null,
 )

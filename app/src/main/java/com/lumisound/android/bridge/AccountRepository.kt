@@ -8,6 +8,7 @@ import com.lumisound.android.bridge.model.BridgeUser
 import com.lumisound.android.bridge.model.LoginRequest
 import com.lumisound.android.bridge.model.RegisterRequest
 import com.lumisound.android.bridge.model.TwoFactorLoginRequest
+import com.lumisound.android.bridge.model.UpdateMeRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,6 +25,12 @@ sealed interface SignInResult {
     data class Success(val user: BridgeUser) : SignInResult
     data class TwoFactorRequired(val pendingToken: String) : SignInResult
     data class Failure(val message: String) : SignInResult
+}
+
+/** Outcome of a `PUT /auth/me` field update (username, display name, ...). */
+sealed interface UpdateResult {
+    data object Success : UpdateResult
+    data class Failure(val message: String) : UpdateResult
 }
 
 /**
@@ -134,6 +141,23 @@ class AccountRepository(
         }
         tokenStore.clear()
         _state.value = AccountState.SignedOut
+    }
+
+    /**
+     * Changes the signed-in account's username. Rate-limited server-side to
+     * twice per rolling 30 days (`ios_username_change_log`) -- the 429's
+     * `detail` message already states exactly when the next change is
+     * allowed, so it's surfaced verbatim via [bridgeDetail] rather than
+     * replaced with a generic message here.
+     */
+    suspend fun updateUsername(newUsername: String): UpdateResult = try {
+        val user = http.auth.updateMe(UpdateMeRequest(username = newUsername.trim()))
+        _state.value = AccountState.SignedIn(user)
+        UpdateResult.Success
+    } catch (e: retrofit2.HttpException) {
+        UpdateResult.Failure(e.bridgeDetail() ?: "The server rejected that (HTTP ${e.code()}).")
+    } catch (e: Exception) {
+        UpdateResult.Failure("Could not reach the bridge: ${e.message ?: e.javaClass.simpleName}")
     }
 
     suspend fun addFavorite(songId: String, title: String?, artist: String?, album: String?) {
