@@ -13,6 +13,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.border
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Favorite
@@ -53,6 +56,10 @@ fun TrackRow(
     isFavorite: Boolean = false,
     isDownloaded: Boolean = false,
     isLocked: Boolean = false,
+    /** File extension (e.g. "flac"), when known -- drives [TrackFormatBadge]. */
+    formatExt: String? = null,
+    /** Hz, when known -- drives [TrackFormatBadge]'s hi-res tier. */
+    sampleRate: Int? = null,
     onClick: () -> Unit = {},
     onMenu: (() -> Unit)? = null,
 ) {
@@ -88,6 +95,11 @@ fun TrackRow(
                     EqualizerBars(playing = true, color = Color.White, height = 18.dp)
                 }
             }
+            TrackFormatBadge(
+                formatExt = formatExt,
+                sampleRate = sampleRate,
+                modifier = Modifier.align(Alignment.TopEnd).padding(2.dp),
+            )
         }
 
         Column(Modifier.weight(1f)) {
@@ -144,6 +156,42 @@ fun TrackRow(
             }
         }
     }
+}
+
+private val LOSSLESS_EXTS = setOf("flac", "wav", "aiff", "aif", "alac")
+
+/**
+ * Small outlined tag calling out lossless/hi-res files -- deliberately silent for the
+ * common case (compressed, standard-rate audio) rather than labeling every row, so it only
+ * draws attention to the notable ones. Mirrors iOS's `SongFormatBadge` thresholds exactly
+ * (lossless container by extension, hi-res by sample rate >44.1kHz) for parity, including
+ * its one real quirk: a 48kHz Opus download reads as "HI-RES" here too, same as there --
+ * this is iOS's own existing behavior, not something to diverge on during a parity port.
+ */
+@Composable
+fun TrackFormatBadge(formatExt: String?, sampleRate: Int?, modifier: Modifier = Modifier) {
+    val ext = formatExt?.lowercase()
+    val isLossless = ext != null && ext in LOSSLESS_EXTS
+    val isHiRes = sampleRate != null && sampleRate > 44_100
+    if (!isLossless && !isHiRes) return
+
+    val palette = LocalLumiPalette.current
+    val label = when {
+        isLossless && isHiRes -> "HI-RES LOSSLESS"
+        isLossless -> ext.uppercase()
+        else -> "HI-RES"
+    }
+    Text(
+        label,
+        modifier = modifier
+            .clip(RoundedCornerShape(3.dp))
+            .background(Color.Black.copy(alpha = 0.35f))
+            .border(1.dp, palette.accent.copy(alpha = 0.5f), RoundedCornerShape(3.dp))
+            .padding(horizontal = 4.dp, vertical = 1.dp),
+        color = palette.accent,
+        fontSize = 8.sp,
+        fontWeight = FontWeight.Bold,
+    )
 }
 
 /**

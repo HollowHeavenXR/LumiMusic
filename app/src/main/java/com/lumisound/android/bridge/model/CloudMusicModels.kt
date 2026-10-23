@@ -35,6 +35,8 @@ data class CloudTrackDto(
      */
     @SerializedName("is_locked") val isLocked: Boolean = false,
     @SerializedName("uploaded_at") val uploadedAt: String? = null,
+    /** Hz -- drives the hi-res badge (iOS parity: >44.1kHz). Null for tracks synced before this field existed. */
+    @SerializedName("sample_rate") val sampleRate: Int? = null,
 )
 
 data class CloudMusicResponse(

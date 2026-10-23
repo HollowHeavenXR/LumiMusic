@@ -352,6 +352,8 @@ private fun LibraryResults(state: SearchUiState, callbacks: SearchCallbacks) {
                 duration = track.durationSeconds.asClock(),
                 isPlaying = state.playingId == track.serverPath,
                 isLocked = track.isLocked,
+                formatExt = track.ext,
+                sampleRate = track.sampleRate,
                 onClick = { callbacks.onPlayLibrary(state.libraryResults, index) },
             )
         }

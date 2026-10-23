@@ -28,6 +28,8 @@ data class CloudTrackEntity(
     val filename: String,
     val bpm: Double?,
     val uploadedAt: String?,
+    /** Hz, e.g. 44100/48000/96000 -- drives the hi-res badge (iOS parity: >44.1kHz). */
+    val sampleRate: Int?,
     /** Millis, local clock -- when this row was last confirmed present on the server. */
     val syncedAt: Long,
 )

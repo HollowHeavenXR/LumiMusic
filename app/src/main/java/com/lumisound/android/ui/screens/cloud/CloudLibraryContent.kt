@@ -192,6 +192,8 @@ fun CloudLibraryContent(
                         isFavorite = track.serverPath in favoriteIds,
                         isDownloaded = track.serverPath in downloadedPaths,
                         isLocked = track.isLocked,
+                        formatExt = track.ext,
+                        sampleRate = track.sampleRate,
                         onClick = { onPlay(tracks, tracks.indexOfFirst { it.serverPath == track.serverPath }) },
                         onMenu = { menuFor = track.serverPath },
                     )

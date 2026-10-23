@@ -221,6 +221,7 @@ fun CloudTrackDto.toEntity(syncedAt: Long) = CloudTrackEntity(
     filename = filename,
     bpm = bpm,
     uploadedAt = uploadedAt,
+    sampleRate = sampleRate,
     syncedAt = syncedAt,
 )
 
