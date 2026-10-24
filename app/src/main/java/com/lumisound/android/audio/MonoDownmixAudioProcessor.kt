@@ -67,9 +67,17 @@ class MonoDownmixAudioProcessor : BaseAudioProcessor() {
     }
 }
 
-/** The one instance `PlaybackService`'s ExoPlayer is built with -- same bridging pattern as `AudioSessionHolder`. */
+/**
+ * One processor per playback engine -- `PlaybackService`'s crossfade coordinator
+ * runs two `ExoPlayer`s concurrently during a crossfade, and a `BaseAudioProcessor`
+ * carries per-pipeline mutable state (`canDownmix`, the output buffer inherited
+ * from the base class), so a single shared instance would be driven by two
+ * renderer threads at once and corrupt both signal paths. [MonoDownmixController]
+ * pushes every setting change to both.
+ */
 object MonoDownmixHolder {
-    val processor = MonoDownmixAudioProcessor()
+    val processorA = MonoDownmixAudioProcessor()
+    val processorB = MonoDownmixAudioProcessor()
 }
 
 /**
@@ -84,13 +92,15 @@ class MonoDownmixController(context: Context) {
     val enabled: StateFlow<Boolean> = _enabled.asStateFlow()
 
     init {
-        MonoDownmixHolder.processor.enabled = _enabled.value
+        MonoDownmixHolder.processorA.enabled = _enabled.value
+        MonoDownmixHolder.processorB.enabled = _enabled.value
     }
 
     fun setEnabled(value: Boolean) {
         if (value == _enabled.value) return
         _enabled.value = value
-        MonoDownmixHolder.processor.enabled = value
+        MonoDownmixHolder.processorA.enabled = value
+        MonoDownmixHolder.processorB.enabled = value
         prefs.edit().putBoolean(KEY_ENABLED, value).apply()
     }
 

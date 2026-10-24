@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Spa
@@ -56,6 +57,8 @@ fun EqualizerScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
     val replayGainEnabled by container.replayGain.enabled.collectAsStateWithLifecycle()
     val eightDEnabled by container.eightDAudio.enabled.collectAsStateWithLifecycle()
     val eightDRotationHz by container.eightDAudio.rotationHz.collectAsStateWithLifecycle()
+    val crossfadeEnabled by container.crossfade.enabled.collectAsStateWithLifecycle()
+    val crossfadeDurationSeconds by container.crossfade.durationSeconds.collectAsStateWithLifecycle()
     EqualizerContent(
         state = state,
         onBack = onBack,
@@ -72,6 +75,10 @@ fun EqualizerScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
         eightDRotationHz = eightDRotationHz,
         onEightDEnabled = container.eightDAudio::setEnabled,
         onEightDRotationHz = container.eightDAudio::setRotationHz,
+        crossfadeEnabled = crossfadeEnabled,
+        crossfadeDurationSeconds = crossfadeDurationSeconds,
+        onCrossfadeEnabled = container.crossfade::setEnabled,
+        onCrossfadeDurationSeconds = container.crossfade::setDurationSeconds,
     )
 }
 
@@ -98,6 +105,10 @@ fun EqualizerContent(
     eightDRotationHz: Double,
     onEightDEnabled: (Boolean) -> Unit,
     onEightDRotationHz: (Double) -> Unit,
+    crossfadeEnabled: Boolean,
+    crossfadeDurationSeconds: Int,
+    onCrossfadeEnabled: (Boolean) -> Unit,
+    onCrossfadeDurationSeconds: (Int) -> Unit,
 ) {
     val palette = LocalLumiPalette.current
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
@@ -225,6 +236,36 @@ fun EqualizerContent(
                         modifier = Modifier.weight(1f),
                     )
                     Text("%.2f Hz".format(eightDRotationHz), style = MaterialTheme.typography.labelLarge)
+                }
+            }
+        }
+
+        IconSectionHeader(Icons.AutoMirrored.Filled.VolumeUp, "Crossfade")
+        GlassPanel {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Songs fade into each other over ${crossfadeDurationSeconds}s instead of cutting straight to the next track.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(
+                    checked = crossfadeEnabled,
+                    onCheckedChange = onCrossfadeEnabled,
+                    colors = SwitchDefaults.colors(checkedTrackColor = palette.accent),
+                )
+            }
+            if (crossfadeEnabled) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Slider(
+                        value = crossfadeDurationSeconds.toFloat(),
+                        valueRange = 1f..10f,
+                        steps = 8,
+                        onValueChange = { onCrossfadeDurationSeconds(it.toInt()) },
+                        colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = palette.accent),
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text("${crossfadeDurationSeconds}s", style = MaterialTheme.typography.labelLarge)
                 }
             }
         }

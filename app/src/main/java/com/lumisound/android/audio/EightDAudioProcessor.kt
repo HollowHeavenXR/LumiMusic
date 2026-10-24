@@ -91,9 +91,15 @@ class EightDAudioProcessor : BaseAudioProcessor() {
     }
 }
 
-/** The one instance `PlaybackService`'s ExoPlayer is built with -- same bridging pattern as `MonoDownmixHolder`. */
+/**
+ * One processor per playback engine -- same reasoning as [MonoDownmixHolder]:
+ * the crossfade coordinator runs two `ExoPlayer`s concurrently during a
+ * crossfade, and sharing one processor instance between two renderer threads
+ * would corrupt both signal paths' phase/format state.
+ */
 object EightDAudioHolder {
-    val processor = EightDAudioProcessor()
+    val processorA = EightDAudioProcessor()
+    val processorB = EightDAudioProcessor()
 }
 
 /**
@@ -113,21 +119,25 @@ class EightDAudioController(context: Context) {
     val rotationHz: StateFlow<Double> = _rotationHz.asStateFlow()
 
     init {
-        EightDAudioHolder.processor.enabled = _enabled.value
-        EightDAudioHolder.processor.rotationHz = _rotationHz.value
+        EightDAudioHolder.processorA.enabled = _enabled.value
+        EightDAudioHolder.processorB.enabled = _enabled.value
+        EightDAudioHolder.processorA.rotationHz = _rotationHz.value
+        EightDAudioHolder.processorB.rotationHz = _rotationHz.value
     }
 
     fun setEnabled(value: Boolean) {
         if (value == _enabled.value) return
         _enabled.value = value
-        EightDAudioHolder.processor.enabled = value
+        EightDAudioHolder.processorA.enabled = value
+        EightDAudioHolder.processorB.enabled = value
         prefs.edit().putBoolean(KEY_ENABLED, value).apply()
     }
 
     fun setRotationHz(hz: Double) {
         val clamped = hz.coerceIn(0.02, 2.0)
         _rotationHz.value = clamped
-        EightDAudioHolder.processor.rotationHz = clamped
+        EightDAudioHolder.processorA.rotationHz = clamped
+        EightDAudioHolder.processorB.rotationHz = clamped
         prefs.edit().putFloat(KEY_ROTATION_HZ, clamped.toFloat()).apply()
     }
 

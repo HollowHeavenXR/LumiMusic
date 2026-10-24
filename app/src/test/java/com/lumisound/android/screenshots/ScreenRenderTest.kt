@@ -599,6 +599,10 @@ class ScreenRenderTest {
                 bassBoostMillibel = 450,
             ),
             onBack = {}, onEnabled = {}, onBand = { _, _ -> }, onPreset = {}, onReset = {}, onBoost = {},
+            onReverbEnabled = {}, onReverbPreset = {},
+            replayGainEnabled = true, onReplayGainEnabled = {},
+            eightDEnabled = false, eightDRotationHz = 0.18, onEightDEnabled = {}, onEightDRotationHz = {},
+            crossfadeEnabled = false, crossfadeDurationSeconds = 2, onCrossfadeEnabled = {}, onCrossfadeDurationSeconds = {},
         )
     }
 

@@ -78,6 +78,7 @@ class AppContainer(private val context: Context) {
     val equalizer by lazy { EqualizerController(context) }
     val monoDownmix by lazy { MonoDownmixController(context) }
     val eightDAudio by lazy { EightDAudioController(context) }
+    val crossfade by lazy { com.lumisound.android.playback.CrossfadeController(context) }
     val player by lazy { PlayerController(context, config, scope) }
     val audioSync by lazy { AudioSettingsSyncService(http, equalizer, player, monoDownmix, replayGain, eightDAudio, scope) }
     val lyrics by lazy { LyricsRepository(http) }
