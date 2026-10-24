@@ -1,8 +1,7 @@
-@file:OptIn(UnstableApi::class)
-
 package com.lumisound.android.audio
 
 import android.content.Context
+import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.BaseAudioProcessor
@@ -37,6 +36,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * written against the decompiled media3 1.11.1 API with no device/emulator
  * available in this environment to confirm actual audio output.
  */
+@OptIn(UnstableApi::class)
 class EightDAudioProcessor : BaseAudioProcessor() {
     @Volatile var enabled: Boolean = false
 
@@ -100,6 +100,7 @@ class EightDAudioProcessor : BaseAudioProcessor() {
  * crossfade, and sharing one processor instance between two renderer threads
  * would corrupt both signal paths' phase/format state.
  */
+@OptIn(UnstableApi::class)
 object EightDAudioHolder {
     val processorA = EightDAudioProcessor()
     val processorB = EightDAudioProcessor()
@@ -112,6 +113,7 @@ object EightDAudioHolder {
  * comment says "Persists to UserDefaults", never synced, so this doesn't
  * sync it either).
  */
+@OptIn(UnstableApi::class)
 class EightDAudioController(context: Context) {
     private val prefs = context.getSharedPreferences("lumimusic_8d", Context.MODE_PRIVATE)
 

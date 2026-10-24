@@ -1,8 +1,7 @@
-@file:OptIn(UnstableApi::class)
-
 package com.lumisound.android.audio
 
 import android.content.Context
+import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.BaseAudioProcessor
@@ -32,6 +31,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * both channels) is the standard approach, but this needs a real listen
  * before being trusted blind.
  */
+@OptIn(UnstableApi::class)
 class MonoDownmixAudioProcessor : BaseAudioProcessor() {
     @Volatile var enabled: Boolean = false
 
@@ -78,6 +78,7 @@ class MonoDownmixAudioProcessor : BaseAudioProcessor() {
  * renderer threads at once and corrupt both signal paths. [MonoDownmixController]
  * pushes every setting change to both.
  */
+@OptIn(UnstableApi::class)
 object MonoDownmixHolder {
     val processorA = MonoDownmixAudioProcessor()
     val processorB = MonoDownmixAudioProcessor()
@@ -88,6 +89,7 @@ object MonoDownmixHolder {
  * `audio_settings_json`'s `monoAudioEnabled` key (see
  * `AudioSettingsSyncService`) -- same shape as `AppearanceStore`.
  */
+@OptIn(UnstableApi::class)
 class MonoDownmixController(context: Context) {
     private val prefs = context.getSharedPreferences("lumimusic_mono", Context.MODE_PRIVATE)
 
