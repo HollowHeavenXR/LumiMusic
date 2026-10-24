@@ -40,8 +40,8 @@ android {
         // percent more devices is not a trade worth making for a new app.
         minSdk = 30
         targetSdk = 37
-        versionCode = 18
-        versionName = "0.13.1"
+        versionCode = 19
+        versionName = "0.14.0"
 
         buildConfigField("String", "DEFAULT_BRIDGE_URL", "\"https://lumisound-bridge.xenusanimations.studio\"")
         buildConfigField("String", "BRIDGE_API_KEY", "\"$bridgeApiKey\"")
