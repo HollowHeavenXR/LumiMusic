@@ -2,10 +2,10 @@ package com.lumisound.android.diagnostics
 
 import android.util.Log
 import java.text.SimpleDateFormat
+import java.util.ArrayDeque
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
-import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 
 enum class LogLevel(val wire: String) {
@@ -44,7 +44,16 @@ object AppLogger {
     /** Bounded so a long session can never grow the log without limit. */
     private const val CAPACITY = 600
 
-    private val entries = CopyOnWriteArrayList<LogEntry>()
+    /**
+     * A plain `ArrayDeque` behind a lock, not `CopyOnWriteArrayList`: the latter
+     * copies its entire backing array on every single write, which is an O(capacity)
+     * cost per log call -- fine at the old, occasional call volume, but "heavy
+     * telemetry" means every network request and every playback event logs too, and
+     * a 600-element array copy on every one of those is exactly the kind of per-call
+     * cost that adds up to a felt stutter on a weak device. `addLast`/`removeFirst`
+     * here are both O(1).
+     */
+    private val entries = ArrayDeque<LogEntry>(CAPACITY)
     private val counters = java.util.concurrent.ConcurrentHashMap<String, AtomicInteger>()
 
     @Volatile
@@ -87,8 +96,10 @@ object AppLogger {
                 extra = extra,
             )
             counters.getOrPut("${level.wire}:$category") { AtomicInteger() }.incrementAndGet()
-            entries.add(entry)
-            while (entries.size > CAPACITY) entries.removeAt(0)
+            synchronized(entries) {
+                entries.addLast(entry)
+                while (entries.size > CAPACITY) entries.removeFirst()
+            }
             sink?.invoke(entry)
             val tag = "Lumi/$category"
             when (level) {
@@ -104,22 +115,24 @@ object AppLogger {
     }
 
     /** Newest last. Used by the Diagnostics screen and bug reports. */
-    fun snapshot(limit: Int = CAPACITY): List<LogEntry> =
-        entries.toList().let { if (it.size <= limit) it else it.subList(it.size - limit, it.size) }
+    fun snapshot(limit: Int = CAPACITY): List<LogEntry> = synchronized(entries) {
+        val all = entries.toList()
+        if (all.size <= limit) all else all.subList(all.size - limit, all.size)
+    }
 
     /** Takes up to [max] entries off the front, for an upload batch. */
-    fun drain(max: Int): List<LogEntry> {
+    fun drain(max: Int): List<LogEntry> = synchronized(entries) {
         val batch = ArrayList<LogEntry>(max)
         while (batch.size < max && entries.isNotEmpty()) {
-            batch.add(entries.removeAt(0))
+            batch.add(entries.removeFirst())
         }
-        return batch
+        batch
     }
 
     /** Putting a failed batch back, oldest first, so nothing is lost to a flush failure. */
-    fun requeue(batch: List<LogEntry>) {
-        entries.addAll(0, batch)
-        while (entries.size > CAPACITY) entries.removeAt(entries.size - 1)
+    fun requeue(batch: List<LogEntry>) = synchronized(entries) {
+        for (entry in batch.asReversed()) entries.addFirst(entry)
+        while (entries.size > CAPACITY) entries.removeLast()
     }
 
     /** `level:category` -> count for this process, for the diagnostics snapshot. */
@@ -132,5 +145,41 @@ object AppLogger {
     fun asText(limit: Int = 300): String = snapshot(limit).joinToString("\n") {
         "${it.timestamp} ${it.level.uppercase()} [${it.category}] ${it.message}" +
             if (it.extra.isEmpty()) "" else " ${it.extra}"
+    }
+}
+
+/**
+ * Wraps [block], logging under [category] (with [operation]'s name and elapsed
+ * time) only if it throws, then rethrows unconditionally -- this never catches
+ * anything a caller wasn't already going to handle, it just makes sure the
+ * handling doesn't happen silently.
+ *
+ * Deliberately silent on the success path, not logged-at-Debug-then-uploaded:
+ * "heavy telemetry... catches everything" is best served by full detail on
+ * every failure, not a log line (and an upload-batch slot) for every one of
+ * the vastly more frequent successes. `inline` so wrapping a call costs one
+ * `System.nanoTime()` and a try/catch, not a new closure allocation -- safe to
+ * reach for at any real operation boundary, but NOT meant for a tight
+ * per-buffer/per-frame loop (an audio processor's `queueInput`, a position
+ * ticker): even a success-silent try/catch adds up at thousands of calls per
+ * second, which is exactly the kind of cost "won't lag" rules out.
+ */
+inline fun <T> traced(
+    category: String,
+    operation: String,
+    // Lazy: building this costs nothing on the overwhelmingly common success
+    // path. A caller computing debug state eagerly here (reading live player
+    // fields, building a map) on every call defeats the whole point of this
+    // being cheap enough to wrap a 4-times-a-second poll loop with.
+    extra: () -> Map<String, Any?> = { emptyMap() },
+    block: () -> T,
+): T {
+    val startedAt = System.nanoTime()
+    try {
+        return block()
+    } catch (t: Throwable) {
+        val ms = (System.nanoTime() - startedAt) / 1_000_000
+        AppLogger.e(category, "$operation failed after ${ms}ms", t, extra())
+        throw t
     }
 }

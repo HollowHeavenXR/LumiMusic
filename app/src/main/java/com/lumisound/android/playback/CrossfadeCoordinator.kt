@@ -7,6 +7,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import com.lumisound.android.audio.AudioSessionHolder
 import com.lumisound.android.diagnostics.AppLogger
+import com.lumisound.android.diagnostics.traced
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -80,10 +81,26 @@ class CrossfadeCoordinator(
         pollJob = scope.launch(Dispatchers.Main) {
             while (true) {
                 delay(250)
-                runCatching { maybeBeginCrossfade() }
+                // Not a bare runCatching: that swallowed a crash in this loop with
+                // zero trace left behind anywhere -- traced() logs it (with the
+                // engines' live state, since that's exactly what a crossfade-timing
+                // bug needs to be diagnosable from a report alone) before letting
+                // the poll continue on the next tick.
+                try {
+                    traced("crossfade", "poll-tick", extra = { crossfadeDebugState() }) { maybeBeginCrossfade() }
+                } catch (t: Throwable) {
+                    // Logged by traced(); the poll loop itself must never die from it.
+                }
             }
         }
     }
+
+    private fun crossfadeDebugState(): Map<String, Any?> = mapOf(
+        "isCrossfading" to isCrossfading,
+        "activeIsA" to (activePlayer === engineA),
+        "activeMediaItemCount" to runCatching { activePlayer.mediaItemCount }.getOrNull(),
+        "activeIndex" to runCatching { activePlayer.currentMediaItemIndex }.getOrNull(),
+    )
 
     /**
      * Called from a [Player.Listener] attached to both engines whenever the
@@ -92,20 +109,31 @@ class CrossfadeCoordinator(
      * abandoned and silenced; the active one continues exactly as if no
      * crossfade had been attempted, matching `AudioPlayerManager.
      * cancelCrossfade()`'s behavior.
+     *
+     * Called directly from `Player.Listener` callbacks (manual seek/skip, a
+     * player error), so a failure here must never escape -- logged and
+     * swallowed instead of risking a listener-dispatch crash over crossfade
+     * bookkeeping.
      */
     fun cancelCrossfade() {
         if (!isCrossfading) return
-        crossfadeJob?.cancel()
-        crossfadeJob = null
-        isCrossfading = false
-        idlePlayer.stop()
-        idlePlayer.clearMediaItems()
-        idlePlayer.volume = 1f
-        // Not hardcoded to 1f -- same reasoning as finishCrossfade: the correct
-        // volume for the still-active engine is whatever its loudness gain says,
-        // which this re-applies now that isCrossfading no longer blocks it.
-        onCrossfadeFinished?.invoke(activePlayer)
-        AppLogger.i("playback", "crossfade cancelled (manual seek/skip)")
+        try {
+            crossfadeJob?.cancel()
+            crossfadeJob = null
+            isCrossfading = false
+            idlePlayer.stop()
+            idlePlayer.clearMediaItems()
+            idlePlayer.volume = 1f
+            // Not hardcoded to 1f -- same reasoning as finishCrossfade: the correct
+            // volume for the still-active engine is whatever its loudness gain says,
+            // which this re-applies now that isCrossfading no longer blocks it.
+            onCrossfadeFinished?.invoke(activePlayer)
+            AppLogger.i("playback", "crossfade cancelled (manual seek/skip)")
+        } catch (t: Throwable) {
+            AppLogger.e("playback", "cancelCrossfade failed", t)
+            isCrossfading = false
+            crossfadeJob = null
+        }
     }
 
     /**
@@ -171,21 +199,48 @@ class CrossfadeCoordinator(
         val steps = (fadeDurationMs / 33L).toInt().coerceAtLeast(1)
         val stepDelayMs = fadeDurationMs / steps
         crossfadeJob = scope.launch(Dispatchers.Main) {
-            var step = 0
-            while (step < steps) {
-                delay(stepDelayMs)
-                // Frozen while paused -- same reasoning as `AudioPlayerManager`'s
-                // own crossfade timer: this ramp is wall-clock, and advancing it
-                // through silence would finish the fade (and stop the outgoing
-                // engine) while the user is still paused on the old track.
-                if (!outgoing.isPlaying && !incoming.isPlaying) continue
-                step++
-                val progress = step.toFloat() / steps
-                val theta = (progress * Math.PI / 2).toFloat()
-                outgoing.volume = cos(theta).coerceIn(0f, 1f)
-                incoming.volume = sin(theta).coerceIn(0f, 1f)
+            // This coroutine is a direct top-level launch on an app-lifetime
+            // SupervisorJob scope with no CoroutineExceptionHandler -- an
+            // uncaught exception here doesn't just fail this one crossfade, it
+            // propagates to the thread's default uncaught-exception handler,
+            // which CrashReporter installs. That turns a bug in a feature that
+            // defaults to OFF into the whole app crashing on every single track
+            // transition for anyone who turns it on. Caught and logged here
+            // instead, with a best-effort fallback to the same cleanup
+            // cancelCrossfade() does, so a crossfade failing degrades to a
+            // plain cut rather than taking playback down with it.
+            try {
+                var step = 0
+                while (step < steps) {
+                    delay(stepDelayMs)
+                    // Frozen while paused -- same reasoning as `AudioPlayerManager`'s
+                    // own crossfade timer: this ramp is wall-clock, and advancing it
+                    // through silence would finish the fade (and stop the outgoing
+                    // engine) while the user is still paused on the old track.
+                    if (!outgoing.isPlaying && !incoming.isPlaying) continue
+                    step++
+                    val progress = step.toFloat() / steps
+                    val theta = (progress * Math.PI / 2).toFloat()
+                    outgoing.volume = cos(theta).coerceIn(0f, 1f)
+                    incoming.volume = sin(theta).coerceIn(0f, 1f)
+                }
+                finishCrossfade(outgoing, incoming, tail)
+            } catch (t: Throwable) {
+                AppLogger.e(
+                    "playback",
+                    "crossfade ramp failed, falling back to a plain cut",
+                    t,
+                    mapOf("fadeDurationMs" to fadeDurationMs, "steps" to steps),
+                )
+                runCatching {
+                    incoming.stop()
+                    incoming.clearMediaItems()
+                    incoming.volume = 1f
+                    outgoing.volume = 1f
+                }
+                isCrossfading = false
+                crossfadeJob = null
             }
-            finishCrossfade(outgoing, incoming, tail)
         }
     }
 

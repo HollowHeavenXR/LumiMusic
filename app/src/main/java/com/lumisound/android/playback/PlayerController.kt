@@ -115,6 +115,12 @@ class PlayerController(
          * A stream that dies is the failure mode with the least visible cause -- the
          * track simply stops -- so it is logged with the error code and the track's own
          * path, which is what tells a locked-file problem apart from a dead session.
+         *
+         * Also walks the `cause` chain for an HTTP status code or a bare connection
+         * failure (host unreachable, connection refused, DNS failure) -- without this,
+         * "the bridge server is down" and "this one track's file is corrupt" both just
+         * show up as the same generic `errorCodeName`, and telling those apart used to
+         * require SSHing into the server and guessing instead of reading the log.
          */
         override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
             val item = controller?.currentMediaItem
@@ -126,6 +132,9 @@ class PlayerController(
                     "mediaId" to item?.mediaId,
                     "isLocked" to (item?.mediaMetadata?.extras?.getBoolean(EXTRA_IS_LOCKED) == true),
                     "isLocal" to (item?.mediaMetadata?.extras?.getBoolean(EXTRA_IS_LOCAL) == true),
+                    "serverPath" to item?.localConfiguration?.uri?.getQueryParameter("path"),
+                    "causeChain" to causeChainSummary(error),
+                    "httpStatus" to httpStatusOf(error),
                 ),
             )
         }
@@ -374,3 +383,30 @@ class PlayerController(
 
 const val EXTRA_SERVER_PATH = "lumi.serverPath"
 const val EXTRA_IS_LOCKED = "lumi.isLocked"
+
+/** "ClassName -> ClassName -> ClassName", up to 6 deep, for a player error's full cause chain. */
+private fun causeChainSummary(error: Throwable): String {
+    val names = ArrayList<String>(6)
+    var current: Throwable? = error
+    while (current != null && names.size < 6) {
+        names.add(current.javaClass.simpleName)
+        current = current.cause.takeIf { it !== current }
+    }
+    return names.joinToString(" -> ")
+}
+
+/**
+ * The HTTP status code, if the failure's cause chain holds an
+ * `HttpDataSource.InvalidResponseCodeException` -- a 502/503 here means the
+ * bridge itself is unreachable or crashed, not a problem with any one track.
+ */
+private fun httpStatusOf(error: Throwable): Int? {
+    var current: Throwable? = error
+    while (current != null) {
+        if (current is androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) {
+            return current.responseCode
+        }
+        current = current.cause.takeIf { it !== current }
+    }
+    return null
+}

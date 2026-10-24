@@ -26,6 +26,7 @@ import com.lumisound.android.audio.EightDAudioHolder
 import com.lumisound.android.audio.EightDAudioProcessor
 import com.lumisound.android.audio.MonoDownmixAudioProcessor
 import com.lumisound.android.audio.MonoDownmixHolder
+import com.lumisound.android.diagnostics.traced
 import com.lumisound.android.widget.NowPlayingWidgetUpdater
 import java.util.concurrent.Executors
 import kotlin.math.pow
@@ -67,6 +68,17 @@ class PlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
+        // The entire dual-engine/session setup below, traced as one unit: if any
+        // of it throws, the service ends up with no working player at all -- the
+        // single most severe version of "playback is broken" there is, and one
+        // that would otherwise surface as a silent service-creation failure with
+        // nothing in the log to say why. Rethrown (not swallowed) since there is
+        // no reasonable fallback to limp along on here; CrashReporter still gets
+        // it, but now with full context logged first.
+        traced("playback", "PlaybackService.onCreate") { buildSessionAndEngines() }
+    }
+
+    private fun buildSessionAndEngines() {
         val container = (application as LumiMusicApp).container
 
         // Every cloud stream is an authenticated request, so the player shares the

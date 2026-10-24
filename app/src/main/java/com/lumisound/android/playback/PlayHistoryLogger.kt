@@ -1,9 +1,9 @@
 package com.lumisound.android.playback
 
-import android.util.Log
 import com.lumisound.android.bridge.BridgeHttp
 import com.lumisound.android.bridge.TokenStore
 import com.lumisound.android.bridge.model.LogPlayRequest
+import com.lumisound.android.diagnostics.AppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -62,14 +62,16 @@ class PlayHistoryLogger(
                 )
             } catch (e: Exception) {
                 // Fire-and-forget: a missed history row is not worth interrupting
-                // playback or showing an error over.
-                Log.w(TAG, "history log failed: ${e.javaClass.simpleName}")
+                // playback or showing an error over. Logged via AppLogger (not just
+                // logcat) so a pattern of these -- e.g. every play failing to log
+                // because the bridge itself is unreachable -- is visible in the
+                // uploaded telemetry instead of only on a device nobody is watching.
+                AppLogger.w("playback", "history log failed", mapOf("title" to title, "error" to e.javaClass.simpleName))
             }
         }
     }
 
     private companion object {
-        const val TAG = "LumiHistory"
         const val SKIP_FILTER_MS = 5_000L
     }
 }
