@@ -79,7 +79,7 @@
         </receiver>
 
         <!-- Needed to Share a separated stem (vocals/instrumental) via a content://
-             URI -- a file:// URI to another app is blocked outright on API 24+. -->
+             URI, since a file:// URI to another app is blocked outright on API 24+. -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
