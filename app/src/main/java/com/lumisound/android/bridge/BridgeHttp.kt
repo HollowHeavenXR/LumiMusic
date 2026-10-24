@@ -6,6 +6,7 @@ import com.lumisound.android.BuildConfig
 import com.lumisound.android.bridge.api.ArtistApi
 import com.lumisound.android.bridge.api.AuthApi
 import com.lumisound.android.bridge.api.GifApi
+import com.lumisound.android.bridge.api.StemSeparationApi
 import com.lumisound.android.bridge.api.CloudMusicApi
 import com.lumisound.android.bridge.api.DiagnosticsApi
 import com.lumisound.android.bridge.api.DiscoveryApi
@@ -101,6 +102,7 @@ class BridgeHttp(
     val gallery: GalleryApi get() = current().create(GalleryApi::class.java)
     val artist: ArtistApi get() = current().create(ArtistApi::class.java)
     val gif: GifApi get() = current().create(GifApi::class.java)
+    val stemSeparation: StemSeparationApi get() = current().create(StemSeparationApi::class.java)
 }
 
 /**

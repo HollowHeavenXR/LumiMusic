@@ -52,6 +52,7 @@ data class PlaybackUiState(
     /** -12..12, independent of [speed] -- iOS parity (`AudioSettings.pitchSemitones`). */
     val pitchSemitones: Float = 0f,
     val isLocalSource: Boolean = false,
+    val isLocked: Boolean = false,
     val playbackError: String? = null,
     /** The queue entry's id: a server path, `local:…`, `youtube:…` or `podcast:…`. */
     val mediaId: String? = null,
@@ -355,6 +356,7 @@ class PlayerController(
             speed = player.playbackParameters.speed,
             pitchSemitones = (kotlin.math.ln(player.playbackParameters.pitch.toDouble()) / kotlin.math.ln(2.0) * 12.0).toFloat(),
             isLocalSource = metadata?.extras?.getBoolean(EXTRA_IS_LOCAL) == true,
+            isLocked = metadata?.extras?.getBoolean(EXTRA_IS_LOCKED) == true,
             playbackError = player.playerError?.let { "${it.errorCodeName}: ${it.message}" },
             mediaId = item?.mediaId,
             trackUrl = metadata?.extras?.getString(EXTRA_TRACK_URL),

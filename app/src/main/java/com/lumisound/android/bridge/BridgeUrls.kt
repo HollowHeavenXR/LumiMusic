@@ -83,6 +83,15 @@ object BridgeUrls {
             .build()
             .toString()
 
+    /** `GET /api/stem-separation/result?job_id=...&stem=vocals|instrumental`. */
+    fun stemResult(baseUrl: String, jobId: String, stem: String): String =
+        Uri.parse(BridgeConfig.normalise(baseUrl)).buildUpon()
+            .appendEncodedPath("api/stem-separation/result")
+            .appendQueryParameter("job_id", jobId)
+            .appendQueryParameter("stem", stem)
+            .build()
+            .toString()
+
     /**
      * [cacheBust] defeats Coil's URL-keyed cache right after this account's own
      * avatar changes -- the URL is otherwise identical before and after an

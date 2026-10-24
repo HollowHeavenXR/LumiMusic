@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.CircularProgressIndicator
@@ -96,6 +97,7 @@ import com.lumisound.android.ui.components.LumiCard
 import com.lumisound.android.ui.components.OneLine
 import com.lumisound.android.ui.components.RingProgress
 import com.lumisound.android.ui.components.SegmentedPill
+import com.lumisound.android.ui.components.StemSeparationDialog
 import com.lumisound.android.ui.components.VinylDisc
 import com.lumisound.android.ui.components.trackSubtitle
 import com.lumisound.android.ui.startRadio
@@ -121,6 +123,7 @@ data class StageActions(
     val onRepeat: () -> Unit = {},
     val onSpeed: (Float) -> Unit = {},
     val onPitch: (Float) -> Unit = {},
+    val onSeparateStems: (() -> Unit)? = null,
     /** Minutes, [SLEEP_END_OF_TRACK], or null to cancel. */
     val onSleepTimer: (Int?) -> Unit = {},
     val onFavorite: (() -> Unit)? = null,
@@ -161,6 +164,7 @@ fun NowPlayingSheet(container: AppContainer, onDismiss: () -> Unit) {
         }
     }
 
+    var editingStems by remember { mutableStateOf(false) }
     val streamId = state.mediaId?.takeIf { it.startsWith("youtube:") }?.removePrefix("youtube:")
     val favoritePath = state.serverPath
     val onFavorite: (() -> Unit)? = if (favoritePath == null) null else {
@@ -210,7 +214,18 @@ fun NowPlayingSheet(container: AppContainer, onDismiss: () -> Unit) {
                 onRemoveFromQueue = { container.player.removeFromQueue(it); queue = container.player.queueSnapshot() },
                 onMoveInQueue = { from, to -> container.player.moveInQueue(from, to); queue = container.player.queueSnapshot() },
                 onStartRadio = onStartRadio,
+                onSeparateStems = favoritePath?.let { { editingStems = true } },
             ),
+        )
+    }
+
+    if (editingStems && favoritePath != null) {
+        StemSeparationDialog(
+            container = container,
+            serverPath = favoritePath,
+            title = state.title ?: "Track",
+            isLocked = state.isLocked,
+            onDismiss = { editingStems = false },
         )
     }
 }
@@ -531,6 +546,11 @@ private fun ToolRow(state: PlaybackUiState, nowMs: Long, actions: StageActions) 
                     DropdownMenuItem(text = { Text("Turn off timer") }, onClick = { sleepMenu = false; actions.onSleepTimer(null) })
                 }
             }
+        }
+        // Real server-side AI separation (Demucs) -- a cloud-only track, so this
+        // is absent (no pill) for a streamed search result or local device file.
+        actions.onSeparateStems?.let { separate ->
+            ToolPill(Icons.Filled.GraphicEq, "Separate", active = false) { separate() }
         }
     }
 }
