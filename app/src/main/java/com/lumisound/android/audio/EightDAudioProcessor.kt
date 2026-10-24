@@ -68,8 +68,15 @@ class EightDAudioProcessor : BaseAudioProcessor() {
         val output = replaceOutputBuffer(limit - position)
 
         if (!enabled || !canPan) {
-            output.put(inputBuffer)
-            output.flip()
+            // Same identity-aliasing crash as MonoDownmixAudioProcessor's
+            // passthrough branch -- see its comment for the confirmed
+            // production stack trace. `replaceOutputBuffer` can return this
+            // same `ByteBuffer` as `inputBuffer`; `ByteBuffer.put` throws
+            // outright when source and destination are identical.
+            if (output !== inputBuffer) {
+                output.put(inputBuffer)
+                output.flip()
+            }
             return
         }
 

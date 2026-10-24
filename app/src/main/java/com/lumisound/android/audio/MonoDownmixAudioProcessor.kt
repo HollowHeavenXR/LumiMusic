@@ -49,8 +49,20 @@ class MonoDownmixAudioProcessor : BaseAudioProcessor() {
         val output = replaceOutputBuffer(limit - position)
 
         if (!enabled || !canDownmix) {
-            output.put(inputBuffer)
-            output.flip()
+            // CONFIRMED CRASH (production stack trace, every track, while
+            // disabled -- the actual cause of a prior "exception on every
+            // track" report): `replaceOutputBuffer` can return THIS SAME
+            // `ByteBuffer` instance as `inputBuffer` -- observed specifically
+            // for a zero-length flush/marker buffer -- and `ByteBuffer.put`
+            // throws `IllegalArgumentException("The source buffer is this
+            // buffer")` outright when source and destination are identical,
+            // never mind the length. When aliased, the bytes are already
+            // exactly where they need to be (same backing storage); nothing
+            // to copy, so skip straight to returning rather than touching it.
+            if (output !== inputBuffer) {
+                output.put(inputBuffer)
+                output.flip()
+            }
             return
         }
 
