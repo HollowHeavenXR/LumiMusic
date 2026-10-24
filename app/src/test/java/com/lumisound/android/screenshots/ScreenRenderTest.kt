@@ -25,6 +25,12 @@ import androidx.compose.ui.Modifier
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.lumisound.android.audio.EqBand
 import com.lumisound.android.audio.EqState
+import androidx.test.core.app.ApplicationProvider
+import com.lumisound.android.bridge.BridgeConfig
+import com.lumisound.android.bridge.BridgeHttp
+import com.lumisound.android.bridge.LoudnessGainStore
+import com.lumisound.android.bridge.TokenStore
+import com.lumisound.android.diagnostics.HttpMetrics
 import com.lumisound.android.bridge.model.AchievementsDto
 import com.lumisound.android.bridge.model.CommunityTrackDto
 import com.lumisound.android.bridge.model.CompatibilityDto
@@ -135,6 +141,12 @@ import java.time.OffsetDateTime
 class ScreenRenderTest {
 
     private val aura = Aura.forKey("youtube:midnight-city")
+
+    /** Only `SettingsContent` needs a real `BridgeHttp` -- it's never actually called over the network in a screenshot test. */
+    private val http by lazy {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        BridgeHttp(BridgeConfig(context), TokenStore(context), LoudnessGainStore(), HttpMetrics())
+    }
 
     private fun capture(
         name: String,
@@ -277,7 +289,7 @@ class ScreenRenderTest {
         serverPath = "$album/$title.opus${if (locked) ".lms" else ""}",
         remoteId = title, title = title, artist = artist, album = album, durationSeconds = seconds,
         genre = "", trackNumber = "", hasArtwork = false, isLocked = locked, ext = "opus",
-        filename = "$title.opus", bpm = null, uploadedAt = null, syncedAt = 0,
+        filename = "$title.opus", bpm = null, uploadedAt = null, sampleRate = null, syncedAt = 0,
     )
 
     private val library = listOf(
@@ -499,6 +511,7 @@ class ScreenRenderTest {
             subscription = Loadable.Ready(PodcastSubscriptionDto("s1", "https://feed.example/a", "The Loudness War")),
             playingGuid = null,
             onBack = {}, onRetry = {}, onPlay = { _, _, _ -> }, onPlayNext = {}, onToggleFollow = {},
+            onPlayFromChapter = { _, _ -> }, onFetchChapters = { emptyList() },
         )
     }
 
@@ -584,6 +597,7 @@ class ScreenRenderTest {
                 galleryLabel = "On · 9 photos from your iPhone",
             ),
             SettingsCallbacks(onBack = {}),
+            http = http,
         )
     }
 

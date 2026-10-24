@@ -29,7 +29,7 @@ class OfflineLibraryTest {
         serverPath = serverPath, remoteId = "id", title = title, artist = artist, album = album,
         durationSeconds = 244.0, genre = "Electronic", trackNumber = trackNumber, hasArtwork = false,
         isLocked = isLocked, ext = ext, filename = serverPath.substringAfterLast('/'), bpm = 105.0,
-        uploadedAt = "2026-09-01T10:00:00", syncedAt = 0L,
+        uploadedAt = "2026-09-01T10:00:00", sampleRate = 44_100, syncedAt = 0L,
     )
 
     // --- Names -------------------------------------------------------------------------
