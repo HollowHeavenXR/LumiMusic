@@ -1,9 +1,12 @@
+@file:OptIn(UnstableApi::class)
+
 package com.lumisound.android.audio
 
 import android.content.Context
 import androidx.media3.common.C
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.BaseAudioProcessor
+import androidx.media3.common.util.UnstableApi
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlinx.coroutines.flow.MutableStateFlow
