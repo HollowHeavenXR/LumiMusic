@@ -1,5 +1,6 @@
 package com.lumisound.android.playback
 
+import android.app.Service
 import android.content.Intent
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
@@ -23,6 +24,7 @@ import com.google.common.util.concurrent.MoreExecutors
 import com.lumisound.android.audio.AudioSessionHolder
 import com.lumisound.android.audio.EightDAudioHolder
 import com.lumisound.android.audio.MonoDownmixHolder
+import com.lumisound.android.widget.NowPlayingWidgetUpdater
 import java.util.concurrent.Executors
 import kotlin.math.pow
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +42,22 @@ import kotlinx.coroutines.launch
 class PlaybackService : MediaSessionService() {
 
     private var session: MediaSession? = null
+
+    /**
+     * The home-screen widget's buttons target this service directly (not a
+     * `MediaController`, which a plain `AppWidgetProvider` has no simple way
+     * to build/await a connection for) -- same component that already owns
+     * the real `Player` instance these three actions call straight into.
+     */
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_WIDGET_PLAY_PAUSE -> session?.player?.let { if (it.isPlaying) it.pause() else it.play() }
+            ACTION_WIDGET_NEXT -> session?.player?.seekToNext()
+            ACTION_WIDGET_PREVIOUS -> session?.player?.seekToPrevious()
+            else -> return super.onStartCommand(intent, flags, startId)
+        }
+        return Service.START_NOT_STICKY
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -93,6 +111,7 @@ class PlaybackService : MediaSessionService() {
 
         val loudnessListener = LoudnessListener(player, container.loudnessGains, container.replayGain)
         player.addListener(loudnessListener)
+        player.addListener(WidgetRefreshListener(this, player))
         // The listener only re-evaluates on a track/play-state change -- toggling
         // this setting mid-track needs its own trigger so the volume it already
         // set actually changes immediately rather than waiting for the next track.
@@ -134,6 +153,28 @@ class PlaybackService : MediaSessionService() {
         }
         session = null
         super.onDestroy()
+    }
+
+    companion object {
+        const val ACTION_WIDGET_PLAY_PAUSE = "com.lumisound.android.widget.PLAY_PAUSE"
+        const val ACTION_WIDGET_NEXT = "com.lumisound.android.widget.NEXT"
+        const val ACTION_WIDGET_PREVIOUS = "com.lumisound.android.widget.PREVIOUS"
+    }
+}
+
+/** Keeps the home-screen widget's title/artist/play-pause icon in sync with real playback. */
+private class WidgetRefreshListener(private val context: android.content.Context, private val player: Player) : Player.Listener {
+    override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) = refresh(mediaItem)
+    override fun onIsPlayingChanged(isPlaying: Boolean) = refresh(player.currentMediaItem)
+
+    private fun refresh(mediaItem: MediaItem?) {
+        val metadata = mediaItem?.mediaMetadata
+        NowPlayingWidgetUpdater.update(
+            context,
+            title = metadata?.title?.toString(),
+            artist = metadata?.artist?.toString(),
+            isPlaying = player.isPlaying,
+        )
     }
 }
 

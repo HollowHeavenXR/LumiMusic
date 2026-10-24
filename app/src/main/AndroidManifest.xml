@@ -67,6 +67,17 @@
             android:foregroundServiceType="dataSync"
             tools:node="merge" />
 
+        <receiver
+            android:name=".widget.NowPlayingWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/now_playing_widget_info" />
+        </receiver>
+
         <!-- Needed to Share a separated stem (vocals/instrumental) via a content://
              URI -- a file:// URI to another app is blocked outright on API 24+. -->
         <provider
