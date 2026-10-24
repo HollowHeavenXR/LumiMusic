@@ -63,11 +63,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lumisound.android.AppContainer
 import com.lumisound.android.BuildConfig
 import com.lumisound.android.bridge.AccountState
+import com.lumisound.android.bridge.BridgeHttp
 import com.lumisound.android.bridge.BridgeUrls
 import com.lumisound.android.bridge.UpdateResult
 import com.lumisound.android.bridge.model.UpdateSettingsRequest
 import com.lumisound.android.ui.Route
 import com.lumisound.android.ui.aura.LocalAura
+import com.lumisound.android.ui.components.AvatarPickerSheet
 import com.lumisound.android.ui.components.GlassButton
 import com.lumisound.android.ui.components.GlowButton
 import com.lumisound.android.ui.components.Hairline
@@ -86,6 +88,7 @@ data class SettingsUiState(
     val displayName: String,
     val username: String?,
     val avatarModel: Any?,
+    val canEditAvatar: Boolean = false,
     val officialBridge: Boolean,
     val bridgeUrl: String,
     val hasSelfHostedKey: Boolean,
@@ -106,6 +109,7 @@ data class SettingsCallbacks(
     val onChangeUsername: suspend (String) -> UpdateResult = { UpdateResult.Failure("Not signed in") },
     val onSetAudioFormat: (String) -> Unit = {},
     val onSetMonoDownmix: (Boolean) -> Unit = {},
+    val onAvatarUploaded: () -> Unit = {},
     val onRescan: () -> Unit = {},
     val onSaveBridge: (String) -> String = { it },
     val onSaveSelfHostedKey: (String?) -> Unit = {},
@@ -127,6 +131,7 @@ fun SettingsScreen(
     onBack: (() -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
+    var avatarCacheBust by remember { mutableStateOf(0L) }
     val account by container.account.state.collectAsStateWithLifecycle()
     val scanState by container.libraryScanner.state.collectAsStateWithLifecycle()
     val gallery by container.gallery.state.collectAsStateWithLifecycle()
@@ -146,10 +151,12 @@ fun SettingsScreen(
     }
 
     SettingsContent(
+        http = container.http,
         state = SettingsUiState(
             displayName = user?.displayName?.takeIf { it.isNotBlank() } ?: user?.username ?: "Not signed in",
             username = user?.username,
-            avatarModel = user?.id?.let { BridgeUrls.avatar(container.config.baseUrl, it) },
+            avatarModel = user?.id?.let { BridgeUrls.avatar(container.config.baseUrl, it, avatarCacheBust.takeIf { it > 0 }) },
+            canEditAvatar = user != null,
             officialBridge = container.config.isOfficial,
             bridgeUrl = container.config.baseUrl,
             hasSelfHostedKey = container.config.hasSelfHostedKey,
@@ -182,6 +189,7 @@ fun SettingsScreen(
             },
             onChangeUsername = { newUsername -> container.account.updateUsername(newUsername) },
             onSetMonoDownmix = { on -> container.monoDownmix.setEnabled(on) },
+            onAvatarUploaded = { avatarCacheBust = System.currentTimeMillis() },
             onSetAudioFormat = { format ->
                 preferredAudioFormat = format
                 scope.launch {
@@ -274,11 +282,12 @@ private fun UsernameDialog(
  * switches are grouped lists below.
  */
 @Composable
-fun SettingsContent(state: SettingsUiState, callbacks: SettingsCallbacks) {
+fun SettingsContent(state: SettingsUiState, callbacks: SettingsCallbacks, http: BridgeHttp) {
     val palette = LocalLumiPalette.current
     val aura = LocalAura.current
     var bridgeUrl by remember(state.bridgeUrl) { mutableStateOf(state.bridgeUrl) }
     var editingBridge by remember { mutableStateOf(false) }
+    var editingAvatar by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf<String?>(null) }
     // The "Connection" group below (self-hosted bridge URL/key) used to be an
     // always-visible top-level settings group — confusing noise for the 99%
@@ -315,7 +324,9 @@ fun SettingsContent(state: SettingsUiState, callbacks: SettingsCallbacks) {
         ) {
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Avatar(state.avatarModel, state.username ?: state.displayName, 68.dp)
+                    Box(Modifier.clickable(enabled = state.canEditAvatar) { editingAvatar = true }) {
+                        Avatar(state.avatarModel, state.username ?: state.displayName, 68.dp)
+                    }
                     Spacer(Modifier.size(14.dp))
                     Column(Modifier.weight(1f)) {
                         OneLine(state.displayName, style = MaterialTheme.typography.titleLarge)
@@ -352,6 +363,14 @@ fun SettingsContent(state: SettingsUiState, callbacks: SettingsCallbacks) {
                         onResult(callbacks.onChangeUsername(newUsername))
                     }
                 },
+            )
+        }
+
+        if (editingAvatar) {
+            AvatarPickerSheet(
+                http = http,
+                onDismiss = { editingAvatar = false },
+                onUploaded = { editingAvatar = false; callbacks.onAvatarUploaded() },
             )
         }
 

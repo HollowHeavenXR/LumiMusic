@@ -83,10 +83,17 @@ object BridgeUrls {
             .build()
             .toString()
 
-    fun avatar(baseUrl: String, userId: String): String =
+    /**
+     * [cacheBust] defeats Coil's URL-keyed cache right after this account's own
+     * avatar changes -- the URL is otherwise identical before and after an
+     * upload (keyed by user id, not content), so without this the old image
+     * would keep showing from cache until some unrelated eviction.
+     */
+    fun avatar(baseUrl: String, userId: String, cacheBust: Long? = null): String =
         Uri.parse(BridgeConfig.normalise(baseUrl)).buildUpon()
             .appendEncodedPath("user/avatar")
             .appendPath(userId)
+            .apply { if (cacheBust != null) appendQueryParameter("v", cacheBust.toString()) }
             .build()
             .toString()
 

@@ -6,6 +6,7 @@ import com.lumisound.android.bridge.model.LoginRequest
 import com.lumisound.android.bridge.model.RegisterRequest
 import com.lumisound.android.bridge.model.TwoFactorLoginRequest
 import com.lumisound.android.bridge.model.UpdateMeRequest
+import okhttp3.RequestBody
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -35,4 +36,8 @@ interface AuthApi {
 
     @POST("auth/logout")
     suspend fun logout()
+
+    /** Raw JPEG or GIF bytes, max 15MB either way -- the server sniffs which. */
+    @POST("user/avatar")
+    suspend fun uploadAvatar(@Body body: RequestBody)
 }

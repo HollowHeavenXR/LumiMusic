@@ -5,6 +5,7 @@ import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.disk.DiskCache
+import coil3.gif.AnimatedImageDecoder
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
@@ -37,6 +38,10 @@ class LumiMusicApp : Application(), SingletonImageLoader.Factory {
             .components {
                 // The app's client, so artwork carries the session token.
                 add(OkHttpNetworkFetcherFactory(callFactory = { container.http.client }))
+                // ImageDecoder-backed (API 28+, always true at this app's minSdk 30) --
+                // needed for GIF avatars (GifPickerSheet) to actually animate anywhere
+                // they're shown, not just decode a static first frame.
+                add(AnimatedImageDecoder.Factory())
             }
             .memoryCache {
                 MemoryCache.Builder().maxSizePercent(context, 0.20).build()
