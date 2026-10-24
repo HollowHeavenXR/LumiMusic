@@ -9,6 +9,7 @@ import com.lumisound.android.gallery.GalleryBackgroundStore
 import android.content.Context
 import com.lumisound.android.audio.AudioSessionHolder
 import com.lumisound.android.audio.AudioSettingsSyncService
+import com.lumisound.android.audio.EightDAudioController
 import com.lumisound.android.audio.EqualizerController
 import com.lumisound.android.audio.MonoDownmixController
 import com.lumisound.android.bridge.AccountRepository
@@ -76,8 +77,9 @@ class AppContainer(private val context: Context) {
     val artworkWarmer by lazy { ArtworkWarmer(context, database, config, scope) }
     val equalizer by lazy { EqualizerController(context) }
     val monoDownmix by lazy { MonoDownmixController(context) }
+    val eightDAudio by lazy { EightDAudioController(context) }
     val player by lazy { PlayerController(context, config, scope) }
-    val audioSync by lazy { AudioSettingsSyncService(http, equalizer, player, monoDownmix, replayGain, scope) }
+    val audioSync by lazy { AudioSettingsSyncService(http, equalizer, player, monoDownmix, replayGain, eightDAudio, scope) }
     val lyrics by lazy { LyricsRepository(http) }
     val searchHistory by lazy { SearchHistoryStore(context) }
     val presence by lazy { PresenceService(http, tokenStore, player, scope) }

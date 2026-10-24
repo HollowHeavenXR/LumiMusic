@@ -54,6 +54,8 @@ import com.lumisound.android.ui.theme.LocalLumiPalette
 fun EqualizerScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
     val state by container.equalizer.state.collectAsStateWithLifecycle()
     val replayGainEnabled by container.replayGain.enabled.collectAsStateWithLifecycle()
+    val eightDEnabled by container.eightDAudio.enabled.collectAsStateWithLifecycle()
+    val eightDRotationHz by container.eightDAudio.rotationHz.collectAsStateWithLifecycle()
     EqualizerContent(
         state = state,
         onBack = onBack,
@@ -66,6 +68,10 @@ fun EqualizerScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
         onReverbPreset = container.equalizer::setReverbPreset,
         replayGainEnabled = replayGainEnabled,
         onReplayGainEnabled = container.replayGain::setEnabled,
+        eightDEnabled = eightDEnabled,
+        eightDRotationHz = eightDRotationHz,
+        onEightDEnabled = container.eightDAudio::setEnabled,
+        onEightDRotationHz = container.eightDAudio::setRotationHz,
     )
 }
 
@@ -88,6 +94,10 @@ fun EqualizerContent(
     onReverbPreset: (String) -> Unit,
     replayGainEnabled: Boolean,
     onReplayGainEnabled: (Boolean) -> Unit,
+    eightDEnabled: Boolean,
+    eightDRotationHz: Double,
+    onEightDEnabled: (Boolean) -> Unit,
+    onEightDRotationHz: (Double) -> Unit,
 ) {
     val palette = LocalLumiPalette.current
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
@@ -188,6 +198,35 @@ fun EqualizerContent(
                     NavChip(label, Icons.Filled.Spa, selected = state.reverbPresetName == name, onClick = { onReverbPreset(name) })
                 }
             )
+        }
+
+        IconSectionHeader(Icons.Filled.GraphicEq, "8D Audio")
+        GlassPanel {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Sound moves slowly around you, left to right and back.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(
+                    checked = eightDEnabled,
+                    onCheckedChange = onEightDEnabled,
+                    colors = SwitchDefaults.colors(checkedTrackColor = palette.accent),
+                )
+            }
+            if (eightDEnabled) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Slider(
+                        value = eightDRotationHz.toFloat(),
+                        valueRange = 0.02f..2f,
+                        onValueChange = { onEightDRotationHz(it.toDouble()) },
+                        colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = palette.accent),
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text("%.2f Hz".format(eightDRotationHz), style = MaterialTheme.typography.labelLarge)
+                }
+            }
         }
     }
 }

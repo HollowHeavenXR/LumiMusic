@@ -21,6 +21,7 @@ import androidx.media3.session.MediaSessionService
 import com.lumisound.android.LumiMusicApp
 import com.google.common.util.concurrent.MoreExecutors
 import com.lumisound.android.audio.AudioSessionHolder
+import com.lumisound.android.audio.EightDAudioHolder
 import com.lumisound.android.audio.MonoDownmixHolder
 import java.util.concurrent.Executors
 import kotlin.math.pow
@@ -64,7 +65,7 @@ class PlaybackService : MediaSessionService() {
                 DefaultAudioSink.Builder(context)
                     .setEnableFloatOutput(enableFloatOutput)
                     .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
-                    .setAudioProcessors(arrayOf(MonoDownmixHolder.processor))
+                    .setAudioProcessors(arrayOf(MonoDownmixHolder.processor, EightDAudioHolder.processor))
                     .build()
         }
 
