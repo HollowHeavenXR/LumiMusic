@@ -43,6 +43,7 @@ import com.lumisound.android.ui.screens.eq.EqualizerScreen
 import com.lumisound.android.ui.screens.home.HomeScreen
 import com.lumisound.android.ui.screens.importer.ImportScreen
 import com.lumisound.android.ui.screens.library.AddToPlaylistDialog
+import com.lumisound.android.ui.screens.library.DuplicateFinderScreen
 import com.lumisound.android.ui.screens.library.FavoritesScreen
 import com.lumisound.android.ui.screens.library.LibraryHomeScreen
 import com.lumisound.android.ui.screens.library.LibrarySection
@@ -247,6 +248,7 @@ private fun Screen(
         Route.GalleryBackground -> GalleryBackgroundScreen(container, onBack = pop)
         Route.Downloads -> DownloadsScreen(container, onBack = pop)
         Route.Diagnostics -> DiagnosticsScreen(container, onBack = pop)
+        Route.DuplicateFinder -> DuplicateFinderScreen(container, onBack = pop)
         Route.Stats -> StatsScreen(container, onBack = pop)
         Route.Rewind -> RewindScreen(container, onBack = pop)
         Route.Achievements -> AchievementsScreen(container, onBack = pop)

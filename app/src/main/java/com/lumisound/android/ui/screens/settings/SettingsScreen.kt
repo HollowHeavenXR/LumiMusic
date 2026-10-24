@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.DownloadForOffline
@@ -470,6 +471,13 @@ fun SettingsContent(state: SettingsUiState, callbacks: SettingsCallbacks, http: 
                 "Diagnostics",
                 "Logs, HTTP routes & reports",
                 onClick = { callbacks.onOpen(Route.Diagnostics) },
+            )
+            Hairline()
+            SettingsRow(
+                Icons.Filled.ContentCopy,
+                "Duplicate Finder",
+                "Files that sound identical in your cloud library",
+                onClick = { callbacks.onOpen(Route.DuplicateFinder) },
             )
         }
 

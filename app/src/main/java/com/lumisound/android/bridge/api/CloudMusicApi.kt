@@ -1,12 +1,15 @@
 package com.lumisound.android.bridge.api
 
+import com.lumisound.android.bridge.model.AcousticDuplicatesResponse
 import com.lumisound.android.bridge.model.CloudMusicResponse
 import com.lumisound.android.bridge.model.CloudSearchResponse
 import com.lumisound.android.bridge.model.MusicUploadResponse
 import okhttp3.RequestBody
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 /**
@@ -45,4 +48,25 @@ interface CloudMusicApi {
         @Query("duration") durationSeconds: Double?,
         @Body body: RequestBody,
     ): MusicUploadResponse
+
+    /**
+     * Groups files that are the same recording acoustically, regardless of
+     * metadata -- Chromaprint fingerprint match, server-side. Serves a
+     * cached result from a periodic background scan unless [forceRescan].
+     * Each group member is a bare filename, not a full relative path --
+     * ambiguous if the same name exists in two different folders, a
+     * pre-existing limitation this shares with iOS's own duplicate finder,
+     * not something new here.
+     */
+    @GET("user/library/acoustic-duplicates")
+    suspend fun acousticDuplicates(@Query("force_rescan") forceRescan: Boolean = false): AcousticDuplicatesResponse
+
+    /**
+     * [filepath] is the relative path with each segment already percent-encoded
+     * individually (not the whole string) and slashes left bare -- the route is
+     * FastAPI's `{filepath:path}` converter, which expects literal `/` between
+     * segments; `encoded = true` stops Retrofit from re-encoding them away.
+     */
+    @DELETE("user/music/{filepath}")
+    suspend fun deleteTrack(@Path(value = "filepath", encoded = true) filepath: String)
 }

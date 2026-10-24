@@ -13,6 +13,7 @@ sealed interface Route {
     data object GalleryBackground : Route
     data object Downloads : Route
     data object Diagnostics : Route
+    data object DuplicateFinder : Route
     data object Stats : Route
     data object Rewind : Route
     data object Achievements : Route
